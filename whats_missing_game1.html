@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>What's Missing? 哪个不见了？</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #ffeaa7 100%);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  h1 { font-size: 2.2em; color: #e17055; text-shadow: 2px 2px 0px #fff; margin-bottom: 10px; }
+  .subtitle { font-size: 1.1em; color: #636e72; margin-bottom: 20px; }
+  .timer {
+    font-size: 4em; font-weight: bold; color: #e17055;
+    text-shadow: 3px 3px 0px #fff; margin: 10px 0; min-height: 80px;
+  }
+  .timer.warning { color: #d63031; animation: pulse 0.5s infinite; }
+  @keyframes pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+  .grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    max-width: 500px; width: 100%; margin: 20px 0;
+  }
+  .grid.grid-9 { gap: 10px; }
+  .grid.grid-9 .card { padding: 10px; }
+  .grid.grid-9 .card .emoji { 
+    font-size: 3em; width: 70px; height: 70px;
+  }
+  .grid.grid-9 .card .card-image { width: 70px; height: 70px; }
+  .grid.grid-9 .card .label { font-size: 0.85em; }
+  .card {
+    background: #fff; border-radius: 20px; padding: 15px; text-align: center;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1); transition: all 0.3s; aspect-ratio: 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border: 4px solid transparent;
+  }
+  .card.missing { border: 4px dashed #b2bec3; background: #dfe6e9; }
+  .card .emoji { 
+    font-size: 4em; line-height: 1; transition: opacity 0.3s;
+    background: linear-gradient(135deg, #f5f7fa 0%, #e4e8eb 100%);
+    width: 90px; height: 90px; display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; margin-bottom: 5px;
+  }
+  .card .card-image { 
+    width: 90px; height: 90px; object-fit: contain; border-radius: 10px;
+    animation: fadeIn 0.3s ease-in;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .card .label { font-size: 0.9em; color: #636e72; margin-top: 5px; font-weight: bold; }
+  .card.missing .emoji, .card.missing .card-image, .card.missing .label { visibility: hidden; }
+  .card.missing::after { content: '❓'; font-size: 3em; color: #b2bec3; }
+  .card.correct { border-color: #00b894; background: #55efc4; animation: bounce 0.5s; }
+  .card.wrong { border-color: #d63031; background: #fab1a0; animation: shake 0.5s; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-15px)} }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-10px)} 75%{transform:translateX(10px)} }
+  .status { font-size: 1.5em; color: #2d3436; min-height: 50px; display: flex; align-items: center; justify-content: center; margin: 10px 0; }
+  .status.success { color: #00b894; }
+  .status.fail { color: #d63031; }
+  .btn {
+    padding: 15px 40px; font-size: 1.3em; border: none; border-radius: 50px;
+    cursor: pointer; transition: all 0.3s; font-weight: bold; margin: 5px;
+  }
+  .btn-primary { background: #e17055; color: #fff; box-shadow: 0 4px 15px rgba(225,112,85,0.4); }
+  .btn-primary:hover { background: #d63031; transform: translateY(-2px); }
+  .btn-small {
+    padding: 8px 20px; font-size: 0.9em; border: 2px solid #0984e3; border-radius: 20px;
+    background: #fff; color: #0984e3; cursor: pointer; transition: all 0.3s;
+  }
+  .btn-small:hover { background: #0984e3; color: #fff; }
+  .mic-btn {
+    width: 100px; height: 100px; border-radius: 50%; border: none;
+    background: #e17055; color: #fff; font-size: 2.5em; cursor: pointer;
+    transition: all 0.3s; box-shadow: 0 6px 20px rgba(225,112,85,0.4);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .mic-btn:hover { transform: scale(1.1); }
+  .mic-btn.recording { background: #d63031; animation: mic-pulse 1s infinite; }
+  @keyframes mic-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(214,48,49,0.7)} 50%{box-shadow:0 0 0 20px rgba(214,48,49,0)} }
+  .version-toggle { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; justify-content: center; }
+  .version-btn {
+    padding: 10px 20px; border: 3px solid #e17055; border-radius: 30px;
+    background: #fff; cursor: pointer; font-size: 1em; transition: all 0.3s;
+  }
+  .version-btn.active { background: #e17055; color: #fff; }
+  .score { font-size: 1.2em; color: #636e72; margin-top: 10px; }
+  .recognized-text { font-size: 1em; color: #0984e3; margin: 10px 0; min-height: 30px; font-style: italic; }
+  .btn-playback {
+    padding: 10px 25px; font-size: 1em; border: 3px solid #0984e3; border-radius: 30px;
+    background: #fff; color: #0984e3; cursor: pointer; transition: all 0.3s;
+    margin-top: 10px; display: none;
+  }
+  .btn-playback:hover { background: #0984e3; color: #fff; }
+  .hint { font-size: 0.9em; color: #636e72; margin-top: 8px; }
+  .toggle-switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+  .toggle-switch input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc; transition: 0.4s; border-radius: 28px;
+  }
+  .toggle-slider:before {
+    position: absolute; content: ""; height: 20px; width: 20px;
+    left: 4px; bottom: 4px; background-color: white; transition: 0.4s; border-radius: 50%;
+  }
+  .toggle-switch input:checked + .toggle-slider { background-color: #00b894; }
+  .toggle-switch input:checked + .toggle-slider:before { transform: translateX(22px); }
+  .panel {
+    display: none; background: #fff; border-radius: 20px; padding: 20px;
+    margin: 10px 0; max-width: 500px; width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  }
+  .panel.show { display: block; }
+  .panel h3 { color: #e17055; margin-bottom: 15px; }
+  .form-row { margin-bottom: 10px; }
+  .form-row label { display: block; color: #636e72; margin-bottom: 5px; font-size: 0.9em; }
+  .form-row input, .form-row textarea {
+    width: 100%; padding: 10px; border: 2px solid #dfe6e9; border-radius: 10px;
+    font-size: 1em; font-family: inherit;
+  }
+  .form-row textarea { height: 100px; resize: vertical; }
+  .word-list { max-height: 200px; overflow-y: auto; margin: 10px 0; }
+  .word-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 10px; border-bottom: 1px solid #eee;
+  }
+  .word-item .delete-btn { color: #d63031; cursor: pointer; font-size: 1.2em; }
+  
+  /* OCR上传区域 */
+  .ocr-upload-area {
+    border: 3px dashed #b2bec3; border-radius: 15px; padding: 30px;
+    text-align: center; cursor: pointer; transition: all 0.3s; margin: 15px 0;
+    background: #f8f9fa;
+  }
+  .ocr-upload-area:hover { border-color: #e17055; background: #fff5f5; }
+  .ocr-upload-area.processing { border-color: #0984e3; background: #e3f2fd; }
+  .ocr-preview-item {
+    display: flex; align-items: center; gap: 15px; padding: 12px;
+    background: #f8f9fa; border-radius: 12px; margin-bottom: 10px;
+    border: 2px solid #dfe6e9;
+  }
+  .ocr-preview-item.success { border-color: #00b894; }
+  .ocr-preview-item img {
+    width: 80px; height: 80px; object-fit: contain; border-radius: 8px;
+    border: 2px solid #dfe6e9; background: #fff;
+  }
+  .ocr-preview-item .word-info { flex: 1; }
+  .ocr-preview-item .word-input {
+    font-size: 1.2em; padding: 8px; border: 2px solid #dfe6e9; border-radius: 8px;
+    width: 100%; max-width: 200px;
+  }
+  .ocr-preview-item .word-input:focus { border-color: #e17055; outline: none; }
+  .ocr-status { font-size: 0.9em; color: #636e72; margin-top: 5px; }
+  .ocr-progress {
+    width: 100%; height: 6px; background: #dfe6e9; border-radius: 3px;
+    margin-top: 10px; overflow: hidden;
+  }
+  .ocr-progress-bar {
+    height: 100%; background: #0984e3; transition: width 0.3s; border-radius: 3px;
+  }
+</style>
+</head>
+<body>
+
+<h1>🎯 What's Missing?</h1>
+<p class="subtitle">哪个不见了？ Which one is gone?</p>
+
+<div class="version-toggle" id="wordSetBtns"></div>
+
+<div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
+  <span style="color: #636e72;">显示单词：</span>
+  <label class="toggle-switch">
+    <input type="checkbox" id="showLabels" checked onchange="toggleLabels()">
+    <span class="toggle-slider"></span>
+  </label>
+  <span id="labelStatus" style="color: #636e72;">ON</span>
+</div>
+
+<div class="timer" id="timer">4</div>
+<div class="grid" id="grid"></div>
+<div class="status" id="status">点击「开始游戏」开始！</div>
+<div class="recognized-text" id="recognizedText"></div>
+
+<div id="micArea" style="display:none; text-align:center;">
+  <button class="mic-btn" id="micBtn" onclick="toggleMic()">🎤</button>
+  <p class="hint">点击开始录音，说完再点一次结束</p>
+</div>
+
+<button class="btn-playback" id="playbackBtn" onclick="playbackRecording()">🔊 听听我的答案</button>
+
+<div style="margin-top: 15px; display: flex; align-items: center; justify-content: center; gap: 20px;">
+  <div style="display: flex; align-items: center; gap: 8px;">
+    <span style="color: #636e72;">卡片数量：</span>
+    <button id="cardCount6" onclick="setCardCount(6)" style="padding: 8px 16px; border: 2px solid #00b894; border-radius: 8px; background: #00b894; color: white; cursor: pointer; font-weight: bold;">6</button>
+    <button id="cardCount9" onclick="setCardCount(9)" style="padding: 8px 16px; border: 2px solid #dfe6e9; border-radius: 8px; background: #f8f9fa; color: #636e72; cursor: pointer; font-weight: bold;">9</button>
+  </div>
+  <button class="btn btn-primary" id="startBtn" onclick="startGame()">🎮 开始游戏 / Start Game</button>
+</div>
+
+<div class="score" id="score">得分 Score: 0 / 0</div>
+
+  <button class="btn-small" style="margin-top: 20px;" onclick="togglePanel()">📚 管理词库</button>
+  <button class="btn-small" style="margin-top: 20px; background: #6c5ce7; border-color: #6c5ce7; color: white;" onclick="openWordList()">📖 单词表</button>
+
+<div class="panel" id="managePanel">
+  <h3>📚 词库管理</h3>
+  
+  <!-- OCR图片识别区域 -->
+  <div style="margin-bottom: 20px;">
+    <h4 style="color: #0984e3;">📷 智能识别（推荐）</h4>
+    <p style="color: #636e72; font-size: 0.9em; margin-bottom: 10px;">
+      上传单词卡片/课本截图，自动识别英文并匹配图片
+    </p>
+    <div class="ocr-upload-area" id="ocrUploadArea" onclick="document.getElementById('ocrInput').click()">
+      📷 点击上传图片（支持多张）
+    </div>
+    <input type="file" id="ocrInput" accept="image/*" multiple style="display:none;" onchange="handleOcrUpload(event)">
+    <div id="ocrProgress" style="display:none;">
+      <div class="ocr-progress"><div class="ocr-progress-bar" id="ocrProgressBar"></div></div>
+      <p class="ocr-status" id="ocrStatus">准备中...</p>
+    </div>
+    <div id="ocrPreview"></div>
+  </div>
+  
+  <hr style="border: 1px solid #eee; margin: 20px 0;">
+  
+  <!-- 手动输入 -->
+  <h4 style="color: #636e72;">✏️ 手动输入</h4>
+  <div class="form-row">
+    <label>课名（可留空自动生成）</label>
+    <input type="text" id="setName" placeholder="如：第5课食物">
+  </div>
+  <div class="form-row">
+    <label>单词（每行一个，格式：emoji 英文）</label>
+    <textarea id="newWords" rows="4" placeholder="🍎 apple
+🍌 banana
+🍇 grape"></textarea>
+  </div>
+  <div style="display: flex; gap: 10px; margin-top: 10px;">
+    <button class="btn-small" onclick="addWordSet()">➕ 添加词库</button>
+    <button class="btn-small" style="background: #0984e3; border-color: #0984e3; color: white;" onclick="preloadAllImages()">🔄 预加载图片</button>
+  </div>
+  
+  <h4 style="margin-top: 20px; color: #636e72;">已保存的词库</h4>
+  <div class="word-list" id="savedWordSets"></div>
+  <button class="btn-small" style="margin-top: 10px;" onclick="togglePanel()">关闭</button>
+</div>
+
+<audio id="audioEl" style="display:none;"></audio>
+
+<script>
+const defaultWordSets = {
+  lesson1: {
+    name: '📖 第1课 Winners',
+    words: [
+      { emoji: '🏀', label: 'basketball' },
+      { emoji: '🏃', label: 'running' },
+      { emoji: '🦘', label: 'jumping' },
+      { emoji: '🤾', label: 'throwing' },
+      { emoji: '🙌', label: 'catching' },
+      { emoji: '🥅', label: 'net' }
+    ]
+  },
+  lesson2: {
+    name: '📖 第2课 Monkey Beach',
+    words: [
+      { emoji: '🍋', label: 'lime' },
+      { emoji: '🥝', label: 'kiwi' },
+      { emoji: '🥭', label: 'mango' },
+      { emoji: '🥥', label: 'coconut' },
+      { emoji: '🎸', label: 'guitar' },
+      { emoji: '📱', label: 'tablet' }
+    ]
+  },
+  lesson3: {
+    name: '📖 第3课 水果',
+    words: [
+      { emoji: '🍎', label: 'apple' },
+      { emoji: '🍌', label: 'banana' },
+      { emoji: '🍇', label: 'grape' },
+      { emoji: '🍊', label: 'orange' },
+      { emoji: '🍓', label: 'strawberry' },
+      { emoji: '🍉', label: 'watermelon' }
+    ]
+  },
+  lesson4: {
+    name: '📖 第4课 动物',
+    words: [
+      { emoji: '🐱', label: 'cat' },
+      { emoji: '🐶', label: 'dog' },
+      { emoji: '🐰', label: 'rabbit' },
+      { emoji: '🐦', label: 'bird' },
+      { emoji: '🐟', label: 'fish' },
+      { emoji: '🐼', label: 'panda' }
+    ]
+  }
+};
+
+let wordSets = {};
+let currentSetId = 'lesson1';
+let gameState = 'idle';
+let missingIndex = -1;
+let timer = null;
+let timeLeft = 4;
+let score = { correct: 0, total: 0 };
+let isRecording = false;
+let cardCount = 6; // 默认6张卡片
+let currentGameItems = []; // 当前这一局的固定卡片（避免重复洗牌导致答案错位）
+let supplemented = false; // 是否从其他词库补充了卡片
+
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+let recognition = null;
+let audioRecorder = null;
+let audioStream = null;
+let audioBlob = null;
+let audioChunks = [];
+
+// ========== 图片缓存系统 ==========
+let imageCache = {};
+let imageCacheLoaded = false;
+
+function loadImageCache() {
+  try {
+    const saved = localStorage.getItem('whatMissingImageCache');
+    if (saved) imageCache = JSON.parse(saved);
+  } catch(e) {}
+  imageCacheLoaded = true;
+}
+
+function saveImageCache() {
+  try {
+    localStorage.setItem('whatMissingImageCache', JSON.stringify(imageCache));
+  } catch(e) {}
+}
+
+// 图片获取：通过 SearchFree.site 搜索真实图片
+// 搜索关键词优化：对容易搜出错的单词使用更精确的搜索词
+const SEARCH_QUERY_MAP = {
+  // Jack and the penguins
+  'penguin': 'penguin bird',
+  'dolphin': 'dolphin ocean',
+  'shark': 'shark ocean',
+  'bat': 'bat animal',
+  'kangaroo': 'kangaroo australia',
+  'zebra': 'zebra africa',
+  'elephant': 'elephant animal',
+  'feed': 'feeding animal',
+  'wash': 'washing hands',
+  'hungry': 'hungry person',
+  'thirsty': 'thirsty person',
+  'carefully': 'child reading carefully',
+  'waterfall': 'waterfall nature',
+  'zoo': 'zoo entrance',
+  'pie': 'food pie',
+  'milkshake': 'drink milkshake',
+  'sandwich': 'food sandwich',
+  'cheese': 'food cheese',
+  'lemonade': 'drink lemonade',
+  'fruit juice': 'fruit juice',
+  'water': 'glass water',
+  'fish': 'food fish',
+  'wrong': 'red cross wrong',
+  'bring': 'hand carrying',
+  'centre': 'center point',
+  'many': 'pile of items',
+  'enjoy': 'happy person',
+  
+  // Our funny home - 家具/物品
+  'sofa': 'couch sofa',
+  'table': 'table',
+  'chair': 'chair furniture',
+  'bed': 'bed bedroom',
+  'lamp': 'lamp',
+  'mirror': 'mirror',
+  'radio': 'radio',
+  'tv': 'television',
+  'clock': 'wall clock',
+  'mat': 'floor mat',
+  'rug': 'rug',
+  'cupboard': 'kitchen cupboard',
+  'bookcase': 'bookshelf',
+  'armchair': 'armchair furniture',
+  'desk': 'desk furniture',
+  'door': 'door',
+  'window': 'window',
+  'wall': 'wall',
+  'shoe': 'shoe',
+  'sock': 'sock',
+  'trousers': 'pants',
+  'hat': 'hat',
+  'balloon': 'balloon colorful',
+  
+  // Our funny home - 房间/地点
+  'kitchen': 'kitchen',
+  'bathroom': 'bathroom modern',
+  'bedroom': 'bedroom interior',
+  'living room': 'living room',
+  'dining room': 'dining room',
+  'hall': 'hallway',
+  'home': 'house',
+  'house': 'house exterior',
+  'garden': 'garden flowers',
+  'flat': 'apartment',
+  'zoo': 'zoo entrance',
+  
+  // Our funny home - 食物/饮品
+  'lemonade': 'drink lemonade',
+  'milkshake': 'drink milkshake',
+  'meat': 'cooked meat',
+  'sandwich': 'food sandwich',
+  'cheese': 'food cheese',
+  'fruit juice': 'fruit juice',
+  'sweets': 'sweets',
+  'fries': 'french fries',
+  'cake': 'birthday cake',
+  'bath': 'bathtub',
+  'pie': 'food pie',
+  'fish': 'food fish',
+  
+  // Our funny home - 动物
+  'hippo': 'hippo',
+  'crocodile': 'crocodile',
+  'lizard': 'lizard',
+  'snake': 'snake',
+  'frog': 'frog',
+  'donkey': 'donkey',
+  'duck': 'duck',
+  'bird': 'bird colorful',
+  'cat': 'cute cat',
+  'dog': 'dog puppy',
+  'rabbit': 'rabbit bunny',
+  'pet': 'pet animal',
+  'animal': 'animal nature',
+  'penguin': 'penguin bird',
+  'dolphin': 'dolphin ocean',
+  'shark': 'shark ocean',
+  'bat': 'bat animal',
+  'kangaroo': 'kangaroo australia',
+  'zebra': 'zebra africa',
+  'elephant': 'elephant animal',
+  
+  // Our funny home - 人物
+  'boy': 'young boy',
+  'girl': 'young girl',
+  'child': 'happy child',
+  'baby': 'baby cute',
+  'dad': 'dad family',
+  'mother': 'mother',
+  'mum': 'mum',
+  'grandfather': 'grandfather',
+  'grandmother': 'grandmother',
+  'grandpa': 'grandpa',
+  'grandma': 'grandma',
+  'family': 'family together',
+  'face': 'human face',
+  'head': 'human head',
+  'hand': 'human hand',
+  'teeth': 'teeth smile',
+  
+  // Our funny home - 其他名词
+  'book': 'open book',
+  'box': 'cardboard box',
+  'pen': 'pen',
+  'pencil': 'pencil',
+  'flower': 'flower garden',
+  'tree': 'tree',
+  'boat': 'boat water',
+  'football': 'soccer ball',
+  'game': 'game fun',
+  'story': 'story book',
+  'painting': 'painting',
+  'number': 'numbers',
+  'colour': 'colorful',
+  'today': 'calendar today',
+  'toy': 'toy',
+  'piano': 'piano',
+  
+  // 其他
+  'bib': 'baby bib eating',
+  'spider': 'spider web',
+  'snail': 'snail shell garden',
+  'whale': 'whale ocean blue',
+  'penguins': 'penguin colony ice',
+  'tablet': 'tablet computer screen',
+  'guitar': 'guitar music instrument',
+  'kiwi': 'kiwi fruit green',
+  'mango': 'mango fruit orange',
+  'coconut': 'coconut tropical',
+  'lime': 'lime citrus fruit green',
+  'basketball': 'basketball ball',
+  'running': 'person running jog',
+  'jumping': 'person jumping high',
+  'throwing': 'person throwing object',
+  'catching': 'person catching ball',
+};
+
+async function fetchImageFromWeb(word) {
+  // 不缓存null/undefined，每次都重试
+  if (imageCache[word] && imageCache[word] !== null) return imageCache[word];
+  
+  // 使用优化后的搜索词
+  const query = SEARCH_QUERY_MAP[word] || word;
+  
+  try {
+    const resp = await fetch('https://searchfree.site/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: query, include_images: true, max_results: 1 })
+    });
+    const data = await resp.json();
+    const url = data.images?.[0]?.url;
+    
+    if (url) {
+      imageCache[word] = url;
+      saveImageCache();
+      return url;
+    }
+  } catch(e) {}
+  
+  // 不缓存失败结果，下次重试
+  return null;
+}
+
+// 批量预加载当前词库的图片
+async function preloadImages(words) {
+  const promises = words.map(w => fetchImageFromWeb(w.label));
+  await Promise.allSettled(promises);
+}
+
+// ========== 全局emoji映射表 ==========
+const EMOJI_MAP = {
+  // 人物
+  'alien': '👽', 'child': '👶', 'children': '👧👦', 'baby': '👶', 'boy': '👦', 'girl': '👧',
+  'man': '👨', 'men': '👨', 'woman': '👩', 'women': '👩', 'people': '👥', 'person': '🧑',
+  'friend': '👫', 'teacher': '👩‍🏫', 'student': '🧑‍🎓', 'family': '👨‍👩‍👧‍👦',
+  'mum': '👩', 'mom': '👩', 'dad': '👨', 'grandma': '👵', 'grandpa': '👴',
+  
+  // 衣服
+  'hat': '🎩', 'cap': '🧢', 'shirt': '👕', 'tshirt': '👕', 't-shirt': '👕',
+  'pants': '👖', 'jeans': '👖', 'shorts': '🩳', 'skirt': '👗', 'dress': '👗',
+  'shoe': '👟', 'shoes': '👟', 'boot': '👢', 'boots': '👢', 'sock': '🧦', 'socks': '🧦',
+  'jacket': '🧥', 'coat': '🧥', 'sweater': '🧥', 'vest': '🦺', 'uniform': '👔',
+  'scarf': '🧣', 'gloves': '🧤', 'glove': '🧤',
+  'glasses': '👓', 'sunglasses': '🕶️', 'goggle': '🥽',
+  'bag': '👜', 'handbag': '👜', 'purse': '👛', 'backpack': '🎒', 'wallet': '👛',
+  'watch': '⌚', 'ring': '💍', 'necklace': '📿', 'bracelet': '📿',
+  'clothes': '👔', 'clothing': '👗', 'costume': '🎭', 'hat': '👒',
+  
+  // 颜色
+  'red': '🔴', 'blue': '🔵', 'green': '🟢', 'yellow': '🟡', 'purple': '🟣',
+  'orange': '🟠', 'pink': '💗', 'black': '⚫', 'white': '⚪', 'brown': '🟤',
+  'grey': '🩶', 'gray': '🩶', 'color': '🌈', 'colour': '🌈',
+  
+  // 水果
+  'apple': '🍎', 'banana': '🍌', 'grape': '🍇', 'grapes': '🍇',
+  'strawberry': '🍓', 'watermelon': '🍉', 'peach': '🍑', 'pear': '🍐',
+  'cherry': '🍒', 'mango': '🥭', 'pineapple': '🍍', 'coconut': '🥥',
+  'kiwi': '🥝', 'lemon': '🍋', 'lime': '🍋', 'orange': '🍊', 'fruit': '🍎',
+  'melon': '🍈', 'plum': '🫐', 'fig': '🫒',
+  
+  // 蔬菜
+  'carrot': '🥕', 'tomato': '🍅', 'potato': '🥔', 'corn': '🌽',
+  'broccoli': '🥦', 'pepper': '🌶️', 'onion': '🧅', 'garlic': '🧄',
+  'vegetable': '🥬', 'salad': '🥗',
+  
+  // 动物
+  'cat': '🐱', 'dog': '🐶', 'fish': '🐟', 'bird': '🐦', 'rabbit': '🐰',
+  'monkey': '🐵', 'bear': '🐻', 'panda': '🐼', 'lion': '🦁', 'tiger': '🐯',
+  'elephant': '🐘', 'giraffe': '🦒', 'penguin': '🐧', 'duck': '🦆', 'frog': '🐸',
+  'turtle': '🐢', 'snake': '🐍', 'whale': '🐳', 'dolphin': '🐬', 'shark': '🦈',
+  'horse': '🐴', 'cow': '🐮', 'pig': '🐷', 'sheep': '🐑', 'goat': '🐐',
+  'chicken': '🐔', 'rooster': '🐓', 'owl': '🦉', 'eagle': '🦅', 'parrot': '🦜',
+  'bee': '🐝', 'butterfly': '🦋', 'ant': '🐜', 'spider': '🕷️', 'snail': '🐌',
+  'crab': '🦀', 'octopus': '🐙', 'squid': '🦑', 'shrimp': '🦐',
+  'animal': '🐾', 'pet': '🐾', 'insect': '🐛',
+  
+  // 食物
+  'cake': '🎂', 'bread': '🍞', 'rice': '🍚', 'noodle': '🍜', 'noodles': '🍜',
+  'egg': '🥚', 'milk': '🥛', 'juice': '🧃', 'water': '💧', 'tea': '🍵',
+  'coffee': '☕', 'ice': '🧊', 'candy': '🍬', 'chocolate': '🍫', 'cookie': '🍪',
+  'pizza': '🍕', 'hamburger': '🍔', 'hotdog': '🌭', 'sandwich': '🥪',
+  'cheese': '🧀', 'meat': '🥩', 'chicken': '🍗', 'steak': '🥩',
+  'soup': '🥣', 'bowl': '🥣', 'plate': '🍽️', 'cup': '🥤', 'glass': '🥛',
+  'fork': '🍴', 'knife': '🔪', 'spoon': '🥄', 'chopsticks': '🥢',
+  'food': '🍽️', 'snack': '🍿', 'breakfast': '🥣', 'lunch': '🍱', 'dinner': '🍽️',
+  
+  // 运动
+  'ball': '⚽', 'basketball': '🏀', 'football': '🏈', 'soccer': '⚽',
+  'tennis': '🎾', 'baseball': '⚾', 'golf': '⛳', 'hockey': '🏒',
+  'swim': '🏊', 'swimming': '🏊', 'run': '🏃', 'running': '🏃',
+  'jump': '🤸', 'jumping': '🤸', 'dance': '💃', 'dancing': '💃',
+  'skip': '🤸', 'climb': '🧗', 'climbing': '🧗', 'walk': '🚶', 'walking': '🚶',
+  'kick': '🦵', 'throw': '🤾', 'throwing': '🤾', 'catch': '🧤', 'catching': '🧤', 'hit': '🏓',
+  'net': '🥅', 'sport': '🏅', 'game': '🎮', 'play': '🎮', 'fun': '🎉',
+  
+  // 学习
+  'book': '📚', 'notebook': '📓', 'diary': '📔', 'magazine': '📰',
+  'pen': '🖊️', 'pencil': '✏️', 'marker': '🖍️', 'crayon': '🖍️',
+  'ruler': '📏', 'eraser': '🧹', 'sharpener': '✏️',
+  'paper': '📄', 'desk': '🪑', 'chair': '🪑', 'table': '🪑',
+  'class': '🏫', 'school': '🏫', 'homework': '📝', 'test': '📝',
+  'letter': '✉️', 'word': '📝', 'sentence': '📝', 'story': '📖',
+  'read': '📖', 'write': '✍️', 'draw': '🎨', 'paint': '🎨',
+  'music': '🎵', 'song': '🎵', 'dance': '💃', 'guitar': '🎸',
+  
+  // 交通
+  'car': '🚗', 'bus': '🚌', 'bike': '🚲', 'bicycle': '🚲',
+  'train': '🚄', 'plane': '✈️', 'airplane': '✈️', 'jet': '✈️',
+  'boat': '⛵', 'ship': '🚢', 'truck': '🚛', 'van': '🚐',
+  'taxi': '🚕', 'motorcycle': '🏍️', 'helicopter': '🚁',
+  'rocket': '🚀', 'ufo': '🛸',
+  'road': '🛤️', 'street': '🛣️', 'highway': '🛣️', 'bridge': '🌉',
+  'traffic': '🚦', 'light': '💡', 'lamp': '🏮',
+  
+  // 自然
+  'sun': '☀️', 'moon': '🌙', 'star': '⭐', 'sky': '🌤️',
+  'cloud': '☁️', 'rain': '🌧️', 'snow': '❄️', 'wind': '🌬️',
+  'storm': '⛈️', 'thunder': '⛈️', 'lightning': '⚡',
+  'tree': '🌳', 'flower': '🌸', 'grass': '🌿', 'leaf': '🍃',
+  'plant': '🌱', 'seed': '🌱', 'root': '🌱', 'branch': '🌿',
+  'mountain': '🏔️', 'hill': '⛰️', 'valley': '🏞️',
+  'river': '🏞️', 'lake': '🏞️', 'sea': '🌊', 'ocean': '🌊',
+  'beach': '🏖️', 'island': '🏝️', 'desert': '🏜️', 'forest': '🌲',
+  'rock': '🪨', 'stone': '🪨', 'sand': '🏖️',
+  'nature': '🌍', 'earth': '🌍', 'world': '🌍',
+  
+  // 身体
+  'head': '👤', 'face': '😊', 'hair': '💇',
+  'eye': '👁️', 'eyes': '👀', 'ear': '👂', 'ears': '👂',
+  'nose': '👃', 'mouth': '👄', 'lip': '👄', 'lips': '👄',
+  'tooth': '🦷', 'teeth': '🦷', 'tongue': '👅',
+  'hand': '✋', 'hands': '🙌', 'finger': '👆', 'fingers': '👆',
+  'arm': '💪', 'arms': '💪', 'leg': '🦵', 'legs': '🦵',
+  'foot': '🦶', 'feet': '🦶', 'toe': '🦶', 'toes': '🦶',
+  'shoulder': '💪', 'knee': '🦵', 'belly': '🤰', 'stomach': '🤰',
+  'body': '🧒', 'skin': '🖐️', 'bone': '🦴', 'blood': '🩸',
+  
+  // 家庭与建筑
+  'house': '🏠', 'home': '🏠', 'building': '🏢', 'apartment': '🏢',
+  'room': '🚪', 'door': '🚪', 'window': '🪟', 'wall': '🧱',
+  'bed': '🛏️', 'sofa': '🛋️', 'chair': '🪑', 'table': '🪑',
+  'kitchen': '🍳', 'bathroom': '🚿', 'bedroom': '🛏️', 'garden': '🌻',
+  'garage': '🚗', 'floor': '🟫', 'ceiling': '⬜', 'roof': '🏠',
+  
+  // 日常用品
+  'phone': '📱', 'telephone': '📞', 'tablet': '📱', 'computer': '💻', 'laptop': '💻',
+  'tv': '📺', 'television': '📺', 'radio': '📻',
+  'clock': '🕐', 'watch': '⌚', 'calendar': '📅',
+  'key': '🔑', 'lock': '🔒', 'umbrella': '☂️', 'umbrealla': '☂️',
+  'mirror': '🪞', 'brush': '🪥', 'comb': '💇',
+  'soap': '🧼', 'towel': '🛁', 'bottle': '🍶', 'box': '📦',
+  'bag': '👜', 'basket': '🧺', 'bucket': '🪣',
+  
+  // 情感与状态
+  'happy': '😊', 'sad': '😢', 'angry': '😠', 'scared': '😨',
+  'surprised': '😲', 'confused': '😕', 'excited': '🤩', 'tired': '😴',
+  'sleepy': '😴', 'hungry': '🍽️', 'thirsty': '🥤', 'sick': '🤒',
+  'hurt': '🤕', 'crying': '😭', 'laughing': '😂', 'smiling': '😄',
+  'love': '❤️', 'like': '👍', 'hate': '👎', 'care': '🫶',
+  
+  // 形容词
+  'big': '🐘', 'small': '🐜', 'large': '🐋', 'tiny': '🐜',
+  'tall': '🦒', 'short': '📉', 'long': '🐍', 'wide': '↔️',
+  'hot': '🔥', 'cold': '🧊', 'warm': '🌡️', 'cool': '❄️',
+  'new': '🆕', 'old': '👴', 'young': '🧒', 'fast': '⚡', 'slow': '🐌',
+  'good': '👍', 'bad': '👎', 'great': '👍', 'terrible': '👎',
+  'clean': '✨', 'dirty': '🪣', 'wet': '💧', 'dry': '☀️',
+  'hard': '💪', 'soft': '🧸', 'heavy': '🏋️', 'light': '🪶',
+  'yes': '✅', 'no': '❌', 'ok': '👌', 'hello': '👋', 'hi': '👋',
+  'bye': '👋', 'goodbye': '👋', 'welcome': '🤝', 'sorry': '😔',
+  'please': '🙏', 'thank': '🙏', 'thanks': '🙏',
+  
+  // 数字
+  'one': '1️⃣', 'two': '2️⃣', 'three': '3️⃣', 'four': '4️⃣', 'five': '5️⃣',
+  'six': '6️⃣', 'seven': '7️⃣', 'eight': '8️⃣', 'nine': '9️⃣', 'ten': '🔟',
+  'zero': '0️⃣', 'number': '🔢', 'count': '🔢',
+  
+  // 天气
+  'weather': '🌤️', 'sunny': '☀️', 'cloudy': '☁️', 'rainy': '🌧️',
+  'snowy': '❄️', 'windy': '🌬️', 'foggy': '🌫️',
+  
+  // 星期与时间
+  'monday': '📅', 'tuesday': '📅', 'wednesday': '📅', 'thursday': '📅',
+  'friday': '📅', 'saturday': '📅', 'sunday': '📅',
+  'today': '📅', 'tomorrow': '📅', 'yesterday': '📅',
+  'morning': '🌅', 'afternoon': '☀️', 'evening': '🌆', 'night': '🌙',
+  'time': '⏰', 'day': '📅', 'week': '📅', 'month': '📅', 'year': '📅',
+  
+  // 节日
+  'birthday': '🎂', 'christmas': '🎄', 'halloween': '🎃',
+  'easter': '🐰', 'party': '🎉', 'gift': '🎁', 'present': '🎁',
+  'balloon': '🎈', 'cake': '🎂', 'candle': '🕯️',
+  
+  // 其他常见词
+  'house': '🏠', 'school': '🏫', 'park': '🌳', 'shop': '🏪', 'store': '🏪',
+  'hospital': '🏥', 'doctor': '👨‍⚕️', 'nurse': '👩‍⚕️', 'police': '👮',
+  'fire': '🔥', 'water': '💧', 'air': '🌬️', 'earth': '🌍',
+  'money': '💰', 'coin': '🪙', 'bank': '🏦', 'shop': '🛒',
+  'movie': '🎬', 'book': '📚', 'game': '🎮', 'toy': '🧸',
+  'picture': '🖼️', 'photo': '📷', 'camera': '📷', 'mirror': '🪞',
+  'magic': '🪄', 'robot': '🤖', 'alien': '👽', 'ghost': '👻',
+  'monster': '👹', 'angel': '😇', 'fairy': '🧚', 'princess': '👸',
+  'prince': '🤴', 'king': '👑', 'queen': '👑', 'superhero': '🦸',
+};
+
+function getEmojiForWord(word) {
+  const clean = word.toLowerCase().replace(/s$/, '');
+  
+  // 精确匹配
+  if (EMOJI_MAP[word]) return EMOJI_MAP[word];
+  if (EMOJI_MAP[clean]) return EMOJI_MAP[clean];
+  
+  // 模糊匹配
+  for (const [key, val] of Object.entries(EMOJI_MAP)) {
+    if (word.includes(key) || key.includes(word)) return val;
+  }
+  
+  return '❓'; // 最终兜底
+}
+
+function init() {
+  // 检查 localStorage 是否可用
+  try {
+    localStorage.setItem('__test', '1');
+    localStorage.removeItem('__test');
+  } catch(e) {
+    document.getElementById('status').innerHTML = '⚠️ 浏览器阻止了本地存储，自定义图片无法保存。<br>请改用 <a href="http://localhost:8080" style="color:#0984e3;">本地服务器</a> 打开，或在 Edge 设置中关闭「跟踪预防」。';
+  }
+  loadImageCache();
+  loadWordSets();
+  renderWordSetButtons();
+  
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = (event) => {
+      let transcript = '';
+      for (let i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      document.getElementById('recognizedText').textContent = `🎤 "${transcript}"`;
+      recognition.transcript = transcript;
+    };
+    recognition.onend = () => {
+      if (isRecording) try { recognition.start(); } catch(e) {}
+    };
+  }
+  
+  resetGame();
+}
+
+function loadWordSets() {
+  const saved = localStorage.getItem('whatMissingWordSets');
+  wordSets = saved ? JSON.parse(saved) : JSON.parse(JSON.stringify(defaultWordSets));
+}
+
+function saveWordSets() {
+  try {
+    localStorage.setItem('whatMissingWordSets', JSON.stringify(wordSets));
+  } catch (e) {
+    console.warn('localStorage save failed:', e);
+    alert('⚠️ 保存失败：图片数据太大，localStorage已满。\n建议减少自定义图片数量或刷新页面重试。');
+  }
+}
+
+function renderWordSetButtons() {
+  const container = document.getElementById('wordSetBtns');
+  container.innerHTML = '';
+  
+  for (const [id, set] of Object.entries(wordSets)) {
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'inline-flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.gap = '2px';
+    wrapper.style.margin = '0 5px';
+    
+    const btn = document.createElement('button');
+    btn.className = 'version-btn' + (id === currentSetId ? ' active' : '');
+    btn.textContent = set.name;
+    btn.onclick = () => { currentSetId = id; renderWordSetButtons(); resetGame(); };
+    wrapper.appendChild(btn);
+    
+    // 编辑按钮
+    const editBtn = document.createElement('button');
+    editBtn.textContent = '✏️';
+    editBtn.style.cssText = 'padding: 6px 10px; font-size: 14px; background: #636e72; border: 2px solid #636e72; color: white; cursor: pointer; border-radius: 0 8px 8px 0; margin-left: -8px;';
+    editBtn.onclick = (e) => { e.stopPropagation(); openEditWordSet(id); };
+    wrapper.appendChild(editBtn);
+    
+    // 删除按钮
+    const delBtn = document.createElement('button');
+    delBtn.textContent = '🗑️';
+    delBtn.style.cssText = 'padding: 6px 10px; font-size: 14px; background: #ff6b6b; border: 2px solid #ff6b6b; color: white; cursor: pointer; border-radius: 8px; margin-left: 2px;';
+    delBtn.onclick = (e) => { e.stopPropagation(); deleteWordSet(id); };
+    wrapper.appendChild(delBtn);
+    
+    container.appendChild(wrapper);
+  }
+  
+  const reviewBtn = document.createElement('button');
+  reviewBtn.className = 'version-btn' + (currentSetId === 'review' ? ' active' : '');
+  reviewBtn.textContent = '🎯 总复习';
+  reviewBtn.style.background = '#00b894';
+  reviewBtn.style.borderColor = '#00b894';
+  reviewBtn.style.color = '#fff';
+  reviewBtn.onclick = () => { currentSetId = 'review'; renderWordSetButtons(); resetGame(); };
+  container.appendChild(reviewBtn);
+}
+
+function setCardCount(count) {
+  cardCount = count;
+  // 更新按钮样式
+  document.getElementById('cardCount6').style.background = count === 6 ? '#00b894' : '#f8f9fa';
+  document.getElementById('cardCount6').style.borderColor = count === 6 ? '#00b894' : '#dfe6e9';
+  document.getElementById('cardCount6').style.color = count === 6 ? 'white' : '#636e72';
+  document.getElementById('cardCount9').style.background = count === 9 ? '#00b894' : '#f8f9fa';
+  document.getElementById('cardCount9').style.borderColor = count === 9 ? '#00b894' : '#dfe6e9';
+  document.getElementById('cardCount9').style.color = count === 9 ? 'white' : '#636e72';
+  resetGame();
+}
+
+function getCurrentWords() {
+  supplemented = false;
+  let allWords = [];
+  if (currentSetId === 'review') {
+    for (const set of Object.values(wordSets)) allWords.push(...set.words);
+  } else {
+    allWords = wordSets[currentSetId]?.words || [];
+  }
+  // 随机打乱并抽取cardCount个
+  const picked = [...allWords].sort(() => Math.random() - 0.5).slice(0, cardCount);
+
+  // 当前词库单词不够时，从其他词库补充（按 label 去重），保证所选卡片数量生效
+  if (picked.length < cardCount) {
+    const usedLabels = new Set(picked.map(w => w.label));
+    for (const set of Object.values(wordSets)) {
+      if (picked.length >= cardCount) break;
+      for (const w of set.words) {
+        if (picked.length >= cardCount) break;
+        if (!usedLabels.has(w.label)) {
+          picked.push(w);
+          usedLabels.add(w.label);
+        }
+      }
+    }
+    if (picked.length > allWords.length) supplemented = true;
+  }
+
+  return picked;
+}
+
+function resetGame() {
+  gameState = 'idle';
+  missingIndex = -1;
+  currentGameItems = [];
+  clearInterval(timer);
+  document.getElementById('timer').textContent = '6';
+  document.getElementById('timer').classList.remove('warning');
+  document.getElementById('status').textContent = '点击「开始游戏」开始！';
+  document.getElementById('status').className = 'status';
+  document.getElementById('startBtn').style.display = '';
+  document.getElementById('startBtn').textContent = '🎮 开始游戏 / Start Game';
+  document.getElementById('micArea').style.display = 'none';
+  document.getElementById('recognizedText').textContent = '';
+  document.getElementById('playbackBtn').style.display = 'none';
+  audioBlob = null;
+  renderGrid(false);
+}
+
+function renderGrid(showMissing) {
+  const grid = document.getElementById('grid');
+  // 游戏进行中时使用固定的卡片序列，避免每次重新洗牌导致答案错位
+  const items = (gameState !== 'idle' && currentGameItems.length > 0)
+    ? currentGameItems
+    : getCurrentWords();
+  const showLabels = document.getElementById('showLabels').checked;
+  grid.innerHTML = '';
+  
+  // 根据卡片数量调整样式
+  grid.className = 'grid' + (cardCount === 9 ? ' grid-9' : '');
+  
+  // 显示加载状态
+  const statusEl = document.getElementById('status');
+  const originalText = statusEl.textContent;
+  
+  items.forEach((item, i) => {
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = `card-${i}`;
+    if (showMissing && i === missingIndex) {
+      card.className = 'card missing';
+    }
+    if (!showMissing || i !== missingIndex) {
+      // 先显示emoji占位
+      card.innerHTML = showLabels
+        ? `<div class="emoji">${item.emoji}</div><div class="label">${item.label}</div>`
+        : `<div class="emoji">${item.emoji}</div>`;
+      
+      // 异步加载真实图片
+      loadCardImage(i, item.label, item.emoji, item.image);
+    }
+    grid.appendChild(card);
+  });
+}
+
+async function loadCardImage(index, word, emoji, customImage) {
+  // 优先使用自定义图片，其次API搜索，最后emoji
+  if (customImage) console.log(`[图片] 卡牌${index}(${word}): 使用自定义图片, 长度=${customImage.length}`);
+  const imgUrl = customImage || await fetchImageFromWeb(word);
+  if (!imgUrl) return; // 没有图片就用emoji
+  
+  const card = document.getElementById(`card-${index}`);
+  if (!card) return;
+  
+  const showLabels = document.getElementById('showLabels').checked;
+  const showMissing = gameState === 'guessing';
+  
+  // 检查这张牌是否已经被移除（guessing阶段）
+  if (showMissing && index === missingIndex) return;
+  
+  // 自定义图片不需要 referrerpolicy 和 cache 清除逻辑
+  const isCustom = !!customImage;
+  const onErrorAttr = isCustom
+    ? 'onerror="this.style.display=\'none\'; this.nextElementSibling.style.display=\'block\';"'
+    : `onerror="this.style.display='none'; this.nextElementSibling.style.display='block'; imageCache['${word}']=undefined; saveImageCache();"`;
+  const imgHtml = `<img class="card-image" src="${imgUrl}" referrerpolicy="no-referrer" ${onErrorAttr}>`;
+  if (showLabels) {
+    card.innerHTML = imgHtml
+      + `<div class="emoji" style="display:none;">${emoji}</div>`
+      + `<div class="label">${word}</div>`;
+  } else {
+    card.innerHTML = imgHtml
+      + `<div class="emoji" style="display:none;">${emoji}</div>`;
+  }
+}
+
+// 批量加载所有词库的图片
+async function preloadAllImages() {
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = '⏳ 正在加载图片...';
+  
+  let total = 0;
+  let loaded = 0;
+  
+  for (const set of Object.values(wordSets)) {
+    total += set.words.length;
+  }
+  
+  for (const set of Object.values(wordSets)) {
+    for (const word of set.words) {
+      await fetchImageFromWeb(word.label);
+      loaded++;
+      statusEl.textContent = `⏳ 加载图片... ${loaded}/${total}`;
+    }
+  }
+  
+  statusEl.textContent = `✅ 图片加载完成！共 ${loaded} 张`;
+  setTimeout(() => {
+    statusEl.textContent = '点击「开始游戏」开始！';
+  }, 2000);
+}
+
+function toggleLabels() {
+  const checked = document.getElementById('showLabels').checked;
+  document.getElementById('labelStatus').textContent = checked ? 'ON' : 'OFF';
+  renderGrid(gameState === 'guessing');
+}
+
+function startGame() {
+  currentGameItems = getCurrentWords();
+  const items = currentGameItems;
+  if (items.length < 2) { alert('词库至少需要2个单词'); return; }
+  
+  gameState = 'memorize';
+  missingIndex = Math.floor(Math.random() * items.length);
+  timeLeft = items.length >= 9 ? 10 : 6; // 9张卡片10秒，6张卡片6秒
+  document.getElementById('timer').textContent = timeLeft;
+  document.getElementById('timer').classList.remove('warning');
+  document.getElementById('status').textContent = supplemented
+    ? '当前词库单词不够，已自动从其他词库补充卡片！记住这些图片！'
+    : '记住这些图片！Remember them!';
+  document.getElementById('status').className = 'status';
+  document.getElementById('startBtn').style.display = 'none';
+  document.getElementById('micArea').style.display = 'none';
+  document.getElementById('recognizedText').textContent = '';
+  document.getElementById('playbackBtn').style.display = 'none';
+  audioBlob = null;
+  renderGrid(false);
+
+  timer = setInterval(() => {
+    timeLeft--;
+    document.getElementById('timer').textContent = timeLeft;
+    if (timeLeft <= 2) document.getElementById('timer').classList.add('warning');
+    if (timeLeft <= 0) {
+      clearInterval(timer);
+      gameState = 'guessing';
+      playBeep();
+      document.getElementById('status').textContent = '🎤 说出哪个不见了！';
+      document.getElementById('micArea').style.display = '';
+      renderGrid(true);
+    }
+  }, 1000);
+}
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 800;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch(e) {}
+}
+
+async function toggleMic() {
+  if (!recognition) { document.getElementById('status').textContent = '❌ 请用Chrome/Edge浏览器'; return; }
+
+  if (isRecording) {
+    isRecording = false;
+    try { recognition.stop(); } catch(e) {}
+    if (audioRecorder && audioRecorder.state === 'recording') audioRecorder.stop();
+    if (audioStream) audioStream.getTracks().forEach(t => t.stop());
+    document.getElementById('micBtn').classList.remove('recording');
+    document.getElementById('status').textContent = '⏳ 正在处理...';
+    setTimeout(checkAnswer, 500);
+  } else {
+    try {
+      audioBlob = null;
+      audioChunks = [];
+      audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioRecorder = new MediaRecorder(audioStream, { mimeType: 'audio/mp4' });
+      audioRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+      audioRecorder.onstop = () => { if (audioChunks.length > 0) audioBlob = new Blob(audioChunks, { type: 'audio/mp4' }); };
+      audioRecorder.start(100);
+      isRecording = true;
+      recognition.transcript = '';
+      document.getElementById('recognizedText').textContent = '';
+      document.getElementById('playbackBtn').style.display = 'none';
+      document.getElementById('micBtn').classList.add('recording');
+      document.getElementById('status').textContent = '🔴 正在录音...说完点击结束';
+      try { recognition.start(); } catch(e) {}
+    } catch (e) {
+      document.getElementById('status').textContent = '❌ 请允许麦克风权限';
+    }
+  }
+}
+
+function checkAnswer() {
+  playBeep();
+  const spoken = (recognition.transcript || '').toLowerCase().trim();
+  const items = currentGameItems;
+  const correctAnswer = items[missingIndex].label.toLowerCase();
+  const isCorrect = spoken.includes(correctAnswer);
+
+  gameState = 'result';
+  score.total++;
+
+  if (isCorrect) {
+    score.correct++;
+    document.getElementById('status').textContent = `🎉 太棒了！是 ${items[missingIndex].label}！`;
+    document.getElementById('status').className = 'status success';
+  } else {
+    document.getElementById('status').textContent = `😅 不对哦，是 ${items[missingIndex].label}！你说的是 "${spoken}"`;
+    document.getElementById('status').className = 'status fail';
+  }
+
+  if (audioBlob && audioBlob.size > 0) {
+    document.getElementById('playbackBtn').dataset.url = URL.createObjectURL(audioBlob);
+    document.getElementById('playbackBtn').style.display = '';
+  }
+
+  document.getElementById('micArea').style.display = 'none';
+  document.getElementById('startBtn').style.display = '';
+  document.getElementById('startBtn').textContent = '🔄 再来一次 / Play Again';
+  document.getElementById('score').textContent = `得分 Score: ${score.correct} / ${score.total}`;
+  renderGrid(true);
+}
+
+function playbackRecording() {
+  const url = document.getElementById('playbackBtn').dataset.url;
+  if (!url) return;
+  const audio = new Audio(url);
+  audio.play().catch(() => {});
+}
+
+// ===== 词库管理 =====
+
+function togglePanel() {
+  document.getElementById('managePanel').classList.toggle('show');
+  renderSavedWordSets();
+}
+
+function renderSavedWordSets() {
+  const container = document.getElementById('savedWordSets');
+  container.innerHTML = '';
+  for (const [id, set] of Object.entries(wordSets)) {
+    const item = document.createElement('div');
+    item.className = 'word-item';
+    item.innerHTML = `
+      <span>${set.name} (${set.words.length}词)</span>
+      <span class="delete-btn" onclick="deleteWordSet('${id}')" title="删除">🗑️</span>
+    `;
+    container.appendChild(item);
+  }
+}
+
+// ===== OCR图片识别 =====
+
+let ocrResults = []; // 存储OCR结果 {image, word}
+
+async function handleOcrUpload(event) {
+  const files = Array.from(event.target.files);
+  if (files.length === 0) return;
+  
+  const uploadArea = document.getElementById('ocrUploadArea');
+  const progressDiv = document.getElementById('ocrProgress');
+  const progressBar = document.getElementById('ocrProgressBar');
+  const statusText = document.getElementById('ocrStatus');
+  const previewDiv = document.getElementById('ocrPreview');
+  
+  uploadArea.classList.add('processing');
+  uploadArea.innerHTML = '⏳ 正在识别中...';
+  progressDiv.style.display = 'block';
+  previewDiv.innerHTML = '';
+  ocrResults = [];
+  
+  const total = files.length;
+  let completed = 0;
+  
+  for (const file of files) {
+    const imageData = await readFileAsDataURL(file);
+    
+    try {
+      statusText.textContent = `正在识别第 ${completed + 1}/${total} 张...`;
+      progressBar.style.width = `${(completed / total) * 100}%`;
+      
+      const result = await Tesseract.recognize(imageData, 'eng', {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            const pct = Math.round(m.progress * 100);
+            statusText.textContent = `识别中... ${pct}%`;
+          }
+        }
+      });
+      
+      // 提取所有英文单词（去重、过滤短词）
+      const text = result.data.text.trim();
+      const allWords = text.match(/[a-zA-Z]{3,}/g) || [];
+      const uniqueWords = [...new Set(allWords.map(w => w.toLowerCase()))];
+      
+      // 过滤掉常见干扰词
+      const ignoreWords = ['the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'way', 'who', 'boy', 'did', 'let', 'put', 'say', 'she', 'too', 'use', 'shop', 'at', 'the', 'page', 'clothes'];
+      const filteredWords = uniqueWords.filter(w => !ignoreWords.includes(w) && w.length >= 3);
+      
+      // 为每个单词查找匹配的emoji
+      filteredWords.forEach(word => {
+        const emoji = getEmojiForWord(word);
+        
+        ocrResults.push({
+          image: null, // 不用原图，用emoji
+          emoji: emoji,
+          word: word,
+          rawText: text.substring(0, 50)
+        });
+      });
+      
+    } catch (e) {
+      console.error('OCR error:', e);
+      ocrResults.push({
+        image: imageData,
+        word: 'unknown',
+        rawText: '识别失败'
+      });
+    }
+    
+    completed++;
+    progressBar.style.width = `${(completed / total) * 100}%`;
+  }
+  
+  // 显示结果
+  statusText.textContent = `识别完成！共 ${ocrResults.length} 张`;
+  uploadArea.classList.remove('processing');
+  uploadArea.innerHTML = '📷 点击继续上传图片';
+  
+  renderOcrPreview();
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderOcrPreview() {
+  const container = document.getElementById('ocrPreview');
+  if (ocrResults.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  let html = '<h4 style="color: #00b894; margin-bottom: 10px;">✅ 识别结果（可编辑）</h4>';
+  
+  ocrResults.forEach((item, i) => {
+    html += `
+      <div class="ocr-preview-item success">
+        <div style="font-size: 48px; width: 60px; text-align: center;">${item.emoji}</div>
+        <div class="word-info">
+          <input class="word-input" type="text" value="${item.word}" 
+                 onchange="updateOcrWord(${i}, this.value)"
+                 placeholder="输入英文单词">
+          <div class="ocr-status">自动配图: ${item.emoji}</div>
+        </div>
+        <button onclick="deleteOcrWord(${i})" title="删除" style="background: #ff6b6b; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 16px; margin-left: 8px;">✕</button>
+      </div>
+    `;
+  });
+  
+  // 添加手动输入行
+  html += `
+    <div class="ocr-preview-item" style="border: 2px dashed #ddd; background: #f9f9f9;">
+      <div style="font-size: 48px; width: 60px; text-align: center;">➕</div>
+      <div class="word-info">
+        <input class="word-input" type="text" id="newWordInput" placeholder="手动添加单词..."
+               onkeypress="if(event.key==='Enter')addOcrWord()">
+      </div>
+      <button onclick="addOcrWord()" title="添加" style="background: #00b894; color: white; border: none; border-radius: 50%; width: 28px; height: 28px; cursor: pointer; font-size: 16px; margin-left: 8px;">✓</button>
+    </div>
+  `;
+  
+  html += `
+    <div style="margin-top: 15px; display: flex; gap: 10px;">
+      <button class="btn-small" onclick="saveOcrAsWordSet()" style="background: #00b894; color: #fff; border-color: #00b894;">
+        💾 保存为词库
+      </button>
+      <button class="btn-small" onclick="clearOcrResults()">🗑️ 清空</button>
+    </div>
+  `;
+  
+  container.innerHTML = html;
+}
+
+function updateOcrWord(index, word) {
+  ocrResults[index].word = word.toLowerCase().trim();
+}
+
+function deleteOcrWord(index) {
+  ocrResults.splice(index, 1);
+  renderOcrPreview();
+}
+
+function addOcrWord() {
+  const input = document.getElementById('newWordInput');
+  const word = input.value.trim().toLowerCase();
+  if (!word) return;
+  
+  const emoji = getEmojiForWord(word);
+  
+  ocrResults.push({ image: null, emoji: emoji, word: word, rawText: '手动添加' });
+  input.value = '';
+  renderOcrPreview();
+}
+
+function saveOcrAsWordSet() {
+  const validResults = ocrResults.filter(r => r.word && r.word !== 'unknown');
+  
+  if (validResults.length < 2) {
+    alert('至少需要2个有效单词');
+    return;
+  }
+  
+  let name = document.getElementById('setName').value.trim();
+  if (!name) {
+    const existing = Object.keys(wordSets).filter(k => k.startsWith('lesson'));
+    name = `📖 第${existing.length + 1}课`;
+  }
+  
+  const words = validResults.map(r => ({
+    emoji: r.emoji || '📝', // 使用自动匹配的emoji
+    label: r.word,
+    image: null // 不保存图片，使用emoji
+  }));
+  
+  const id = 'lesson_' + Date.now();
+  wordSets[id] = { name, words };
+  saveWordSets();
+  renderWordSetButtons();
+  
+  // 清空
+  document.getElementById('setName').value = '';
+  ocrResults = [];
+  renderOcrPreview();
+  renderSavedWordSets();
+  
+  alert(`保存成功！"${name}" 包含 ${words.length} 个单词`);
+}
+
+function clearOcrResults() {
+  ocrResults = [];
+  renderOcrPreview();
+}
+
+function addWordSet() {
+  let name = document.getElementById('setName').value.trim();
+  const text = document.getElementById('newWords').value.trim();
+  
+  if (!name) {
+    const existing = Object.keys(wordSets).filter(k => k.startsWith('lesson'));
+    name = `📖 第${existing.length + 1}课`;
+  }
+  if (!text) { alert('请输入单词'); return; }
+  
+  const words = parseWords(text);
+  if (words.length < 2) { alert('至少需要2个单词'); return; }
+  
+  const id = 'lesson_' + Date.now();
+  wordSets[id] = { name, words };
+  saveWordSets();
+  renderWordSetButtons();
+  document.getElementById('setName').value = '';
+  document.getElementById('newWords').value = '';
+  renderSavedWordSets();
+  alert(`添加成功！"${name}" 包含 ${words.length} 个单词`);
+}
+
+function parseWords(text) {
+  return text.split('\n').filter(l => l.trim()).map(line => {
+    const parts = line.trim().split(/\s+/);
+    return parts.length >= 2 ? { emoji: parts[0], label: parts.slice(1).join(' ').toLowerCase() } : null;
+  }).filter(Boolean);
+}
+
+function deleteWordSet(id) {
+  if (Object.keys(wordSets).length <= 1) { alert('至少保留一个词库'); return; }
+  if (!confirm(`确定删除「${wordSets[id].name}」吗？`)) return;
+  delete wordSets[id];
+  saveWordSets();
+  if (currentSetId === id) currentSetId = Object.keys(wordSets)[0];
+  renderWordSetButtons();
+  renderSavedWordSets();
+  resetGame();
+}
+
+// ========== 编辑词库功能 ==========
+let editingSetId = null;
+
+function openEditWordSet(id) {
+  editingSetId = id;
+  const set = wordSets[id];
+  document.getElementById('editSetName').value = set.name;
+  renderEditWordsList();
+  document.getElementById('editModal').style.display = 'flex';
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').style.display = 'none';
+  editingSetId = null;
+}
+
+function renderEditWordsList() {
+  const container = document.getElementById('editWordsList');
+  const set = wordSets[editingSetId];
+  
+  let html = '';
+  set.words.forEach((w, i) => {
+    var hasCustomImg = w.image && w.image.length > 0;
+    var cachedImg = !hasCustomImg && imageCache[w.label] ? imageCache[w.label] : null;
+    var showImg = hasCustomImg ? w.image : cachedImg;
+    var imgStyle = 'width:40px;height:40px;border-radius:8px;object-fit:cover;cursor:pointer;border:2px solid #b2bec3;';
+    var imgHtml = showImg
+      ? `<div style="position:relative;display:inline-block;">` +
+        `<img src="${showImg}" style="${imgStyle}" referrerpolicy="no-referrer" onclick="triggerEditImageUpload(${i})" onerror="this.style.display='none'; this.nextElementSibling.style.display='inline-flex';">` +
+        `<span onclick="event.stopPropagation();removeEditImage(${i})" style="position:absolute;top:-4px;right:-4px;background:${hasCustomImg ? '#e17055' : '#b2bec3'};color:white;border-radius:50%;width:16px;height:16px;font-size:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;" title="${hasCustomImg ? '移除自定义图片' : '点击上传图片'}">${hasCustomImg ? '✕' : '📷'}</span>` +
+        `</div>` +
+        `<span style="font-size:28px;display:none;">${w.emoji}</span>`
+      : `<span onclick="triggerEditImageUpload(${i})" style="font-size:28px;cursor:pointer;border:2px dashed #b2bec3;border-radius:8px;width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;" title="点击上传图片">${w.emoji}</span>`;
+    html += `
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; background: #f8f9fa; padding: 8px 12px; border-radius: 8px;">
+        ${imgHtml}
+        <input type="text" value="${w.label}" onchange="updateEditWord(${i}, this.value)" 
+               style="flex: 1; padding: 6px 10px; border: 2px solid #dfe6e9; border-radius: 6px; font-size: 1em;">
+        <button onclick="deleteEditWord(${i})" style="background: #ff6b6b; color: white; border: none; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-size: 14px;">✕</button>
+      </div>
+    `;
+  });
+  
+  // 添加新单词行
+  html += `
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; background: #e8f8f5; padding: 8px 12px; border-radius: 8px; border: 2px dashed #00b894;">
+      <span style="font-size: 28px;">➕</span>
+      <input type="text" id="editNewWordInput" placeholder="添加新单词..." 
+             onkeypress="if(event.key==='Enter')addEditWord()"
+             style="flex: 1; padding: 6px 10px; border: 2px solid #dfe6e9; border-radius: 6px; font-size: 1em;">
+      <button onclick="addEditWord()" style="background: #00b894; color: white; border: none; border-radius: 50%; width: 26px; height: 26px; cursor: pointer; font-size: 14px;">✓</button>
+    </div>
+  `;
+  
+  container.innerHTML = html;
+}
+
+function updateEditWord(index, value) {
+  wordSets[editingSetId].words[index].label = value.trim().toLowerCase();
+}
+
+function deleteEditWord(index) {
+  wordSets[editingSetId].words.splice(index, 1);
+  renderEditWordsList();
+}
+
+function resizeImage(file, maxSize, quality) {
+  maxSize = maxSize || 200;
+  quality = quality || 0.7;
+  return new Promise(function(resolve) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var img = new Image();
+      img.onload = function() {
+        var canvas = document.createElement('canvas');
+        var w = img.width, h = img.height;
+        if (w > maxSize || h > maxSize) {
+          if (w > h) { h = h * maxSize / w; w = maxSize; }
+          else { w = w * maxSize / h; h = maxSize; }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+var editingImageIndex = -1;
+
+function triggerEditImageUpload(index) {
+  editingImageIndex = index;
+  document.getElementById('editImageFileInput').value = '';
+  document.getElementById('editImageFileInput').click();
+}
+
+function handleEditImageUpload(event) {
+  var file = event.target.files[0];
+  if (!file || editingImageIndex < 0) return;
+  resizeImage(file, 200, 0.7).then(function(dataUrl) {
+    wordSets[editingSetId].words[editingImageIndex].image = dataUrl;
+    saveWordSets();
+    renderEditWordsList();
+  });
+}
+
+function removeEditImage(index) {
+  delete wordSets[editingSetId].words[index].image;
+  renderEditWordsList();
+}
+
+function addEditWord() {
+  const input = document.getElementById('editNewWordInput');
+  const word = input.value.trim().toLowerCase();
+  if (!word) return;
+  
+  const emoji = getEmojiForWord(word);
+  
+  wordSets[editingSetId].words.push({ emoji, label: word });
+  input.value = '';
+  renderEditWordsList();
+}
+
+function saveEditChanges() {
+  const newName = document.getElementById('editSetName').value.trim();
+  if (!newName) { alert('词库名不能为空'); return; }
+  if (wordSets[editingSetId].words.length < 2) { alert('至少需要2个单词'); return; }
+  
+  wordSets[editingSetId].name = newName;
+  saveWordSets();
+  renderWordSetButtons();
+  renderSavedWordSets();
+  closeEditModal();
+  resetGame();
+}
+
+// ========== 英汉词典 ==========
+const dictionary = {
+  // 衣服
+  'hat': { phonetic: '/hæt/', chinese: '帽子' },
+  'cap': { phonetic: '/kæp/', chinese: '鸭舌帽' },
+  'shirt': { phonetic: '/ʃɜːrt/', chinese: '衬衫' },
+  't-shirt': { phonetic: '/ˈtiːʃɜːrt/', chinese: 'T恤' },
+  'pants': { phonetic: '/pænts/', chinese: '裤子' },
+  'jeans': { phonetic: '/dʒiːnz/', chinese: '牛仔裤' },
+  'skirt': { phonetic: '/skɜːrt/', chinese: '短裙' },
+  'dress': { phonetic: '/dres/', chinese: '连衣裙' },
+  'shoe': { phonetic: '/ʃuː/', chinese: '鞋子' },
+  'shoes': { phonetic: '/ʃuːz/', chinese: '鞋子(复数)' },
+  'sock': { phonetic: '/sɑːk/', chinese: '袜子' },
+  'socks': { phonetic: '/sɑːks/', chinese: '袜子(复数)' },
+  'jacket': { phonetic: '/ˈdʒækɪt/', chinese: '夹克' },
+  'coat': { phonetic: '/koʊt/', chinese: '外套' },
+  'sweater': { phonetic: '/ˈswetər/', chinese: '毛衣' },
+  'scarf': { phonetic: '/skɑːrf/', chinese: '围巾' },
+  'gloves': { phonetic: '/ɡlʌvz/', chinese: '手套' },
+  'glasses': { phonetic: '/ˈɡlæsɪz/', chinese: '眼镜' },
+  'sunglasses': { phonetic: '/ˈsʌnɡlæsɪz/', chinese: '太阳镜' },
+  'bag': { phonetic: '/bæɡ/', chinese: '包' },
+  'handbag': { phonetic: '/ˈhændbæɡ/', chinese: '手提包' },
+  'purse': { phonetic: '/pɜːrs/', chinese: '钱包' },
+  'watch': { phonetic: '/wɑːtʃ/', chinese: '手表' },
+  'ring': { phonetic: '/rɪŋ/', chinese: '戒指' },
+  'necklace': { phonetic: '/ˈnekləs/', chinese: '项链' },
+  'clothes': { phonetic: '/kloʊðz/', chinese: '衣服' },
+  'clothing': { phonetic: '/ˈkloʊðɪŋ/', chinese: '服装' },
+  
+  // 颜色
+  'red': { phonetic: '/red/', chinese: '红色' },
+  'blue': { phonetic: '/bluː/', chinese: '蓝色' },
+  'green': { phonetic: '/ɡriːn/', chinese: '绿色' },
+  'yellow': { phonetic: '/ˈjeloʊ/', chinese: '黄色' },
+  'purple': { phonetic: '/ˈpɜːrpl/', chinese: '紫色' },
+  'orange': { phonetic: '/ˈɔːrɪndʒ/', chinese: '橙色' },
+  'pink': { phonetic: '/pɪŋk/', chinese: '粉色' },
+  'black': { phonetic: '/blæk/', chinese: '黑色' },
+  'white': { phonetic: '/waɪt/', chinese: '白色' },
+  'brown': { phonetic: '/braʊn/', chinese: '棕色' },
+  'grey': { phonetic: '/ɡreɪ/', chinese: '灰色' },
+  'gray': { phonetic: '/ɡreɪ/', chinese: '灰色' },
+  
+  // 水果
+  'apple': { phonetic: '/ˈæpl/', chinese: '苹果' },
+  'banana': { phonetic: '/bəˈnænə/', chinese: '香蕉' },
+  'grape': { phonetic: '/ɡreɪp/', chinese: '葡萄' },
+  'grapes': { phonetic: '/ɡreɪps/', chinese: '葡萄(复数)' },
+  'strawberry': { phonetic: '/ˈstrɔːberi/', chinese: '草莓' },
+  'watermelon': { phonetic: '/ˈwɔːtərmelən/', chinese: '西瓜' },
+  'peach': { phonetic: '/piːtʃ/', chinese: '桃子' },
+  'pear': { phonetic: '/per/', chinese: '梨' },
+  'cherry': { phonetic: '/ˈtʃeri/', chinese: '樱桃' },
+  'mango': { phonetic: '/ˈmæŋɡoʊ/', chinese: '芒果' },
+  'pineapple': { phonetic: '/ˈpaɪnæpl/', chinese: '菠萝' },
+  'coconut': { phonetic: '/ˈkoʊkənʌt/', chinese: '椰子' },
+  'kiwi': { phonetic: '/ˈkiːwiː/', chinese: '猕猴桃' },
+  'lemon': { phonetic: '/ˈlemən/', chinese: '柠檬' },
+  'orange': { phonetic: '/ˈɔːrɪndʒ/', chinese: '橙子' },
+  
+  // 动物
+  'cat': { phonetic: '/kæt/', chinese: '猫' },
+  'dog': { phonetic: '/dɔːɡ/', chinese: '狗' },
+  'fish': { phonetic: '/fɪʃ/', chinese: '鱼' },
+  'bird': { phonetic: '/bɜːrd/', chinese: '鸟' },
+  'rabbit': { phonetic: '/ˈræbɪt/', chinese: '兔子' },
+  'monkey': { phonetic: '/ˈmʌŋki/', chinese: '猴子' },
+  'bear': { phonetic: '/ber/', chinese: '熊' },
+  'panda': { phonetic: '/ˈpændə/', chinese: '熊猫' },
+  'lion': { phonetic: '/ˈlaɪən/', chinese: '狮子' },
+  'tiger': { phonetic: '/ˈtaɪɡər/', chinese: '老虎' },
+  'elephant': { phonetic: '/ˈelɪfənt/', chinese: '大象' },
+  'giraffe': { phonetic: '/dʒɪˈræf/', chinese: '长颈鹿' },
+  'penguin': { phonetic: '/ˈpeŋɡwɪn/', chinese: '企鹅' },
+  'duck': { phonetic: '/dʌk/', chinese: '鸭子' },
+  'frog': { phonetic: '/frɔːɡ/', chinese: '青蛙' },
+  'turtle': { phonetic: '/ˈtɜːrtl/', chinese: '乌龟' },
+  'snake': { phonetic: '/sneɪk/', chinese: '蛇' },
+  'whale': { phonetic: '/weɪl/', chinese: '鲸鱼' },
+  'dolphin': { phonetic: '/ˈdɑːlfɪn/', chinese: '海豚' },
+  'shark': { phonetic: '/ʃɑːrk/', chinese: '鲨鱼' },
+  
+  // 食物
+  'cake': { phonetic: '/keɪk/', chinese: '蛋糕' },
+  'bread': { phonetic: '/bred/', chinese: '面包' },
+  'rice': { phonetic: '/raɪs/', chinese: '米饭' },
+  'noodle': { phonetic: '/ˈnuːdl/', chinese: '面条' },
+  'noodles': { phonetic: '/ˈnuːdlz/', chinese: '面条(复数)' },
+  'egg': { phonetic: '/eɡ/', chinese: '鸡蛋' },
+  'milk': { phonetic: '/mɪlk/', chinese: '牛奶' },
+  'juice': { phonetic: '/dʒuːs/', chinese: '果汁' },
+  'water': { phonetic: '/ˈwɔːtər/', chinese: '水' },
+  'tea': { phonetic: '/tiː/', chinese: '茶' },
+  'coffee': { phonetic: '/ˈkɔːfi/', chinese: '咖啡' },
+  'ice': { phonetic: '/aɪs/', chinese: '冰' },
+  'candy': { phonetic: '/ˈkændi/', chinese: '糖果' },
+  'chocolate': { phonetic: '/ˈtʃɑːklət/', chinese: '巧克力' },
+  'cookie': { phonetic: '/ˈkʊki/', chinese: '饼干' },
+  'pizza': { phonetic: '/ˈpiːtsə/', chinese: '披萨' },
+  'hamburger': { phonetic: '/ˈhæmbɜːrɡər/', chinese: '汉堡' },
+  'hotdog': { phonetic: '/ˈhɑːtdɔːɡ/', chinese: '热狗' },
+  'sandwich': { phonetic: '/ˈsænwɪtʃ/', chinese: '三明治' },
+  'salad': { phonetic: '/ˈsæləd/', chinese: '沙拉' },
+  
+  // 运动
+  'ball': { phonetic: '/bɔːl/', chinese: '球' },
+  'basketball': { phonetic: '/ˈbæskɪtbɔːl/', chinese: '篮球' },
+  'football': { phonetic: '/ˈfʊtbɔːl/', chinese: '足球' },
+  'tennis': { phonetic: '/ˈtenɪs/', chinese: '网球' },
+  'baseball': { phonetic: '/ˈbeɪsbɔːl/', chinese: '棒球' },
+  'swim': { phonetic: '/swɪm/', chinese: '游泳' },
+  'run': { phonetic: '/rʌn/', chinese: '跑步' },
+  'jump': { phonetic: '/dʒʌmp/', chinese: '跳' },
+  'dance': { phonetic: '/dæns/', chinese: '跳舞' },
+  'skip': { phonetic: '/skɪp/', chinese: '跳绳' },
+  
+  // 学习
+  'book': { phonetic: '/bʊk/', chinese: '书' },
+  'pen': { phonetic: '/pen/', chinese: '钢笔' },
+  'pencil': { phonetic: '/ˈpensl/', chinese: '铅笔' },
+  'ruler': { phonetic: '/ˈruːlər/', chinese: '尺子' },
+  'eraser': { phonetic: '/ɪˈreɪsər/', chinese: '橡皮' },
+  'paper': { phonetic: '/ˈpeɪpər/', chinese: '纸' },
+  'desk': { phonetic: '/desk/', chinese: '课桌' },
+  'chair': { phonetic: '/tʃer/', chinese: '椅子' },
+  'table': { phonetic: '/ˈteɪbl/', chinese: '桌子' },
+  
+  // 交通
+  'car': { phonetic: '/kɑːr/', chinese: '汽车' },
+  'bus': { phonetic: '/bʌs/', chinese: '公交车' },
+  'bike': { phonetic: '/baɪk/', chinese: '自行车' },
+  'train': { phonetic: '/treɪn/', chinese: '火车' },
+  'plane': { phonetic: '/pleɪn/', chinese: '飞机' },
+  'boat': { phonetic: '/boʊt/', chinese: '小船' },
+  'ship': { phonetic: '/ʃɪp/', chinese: '轮船' },
+  'truck': { phonetic: '/trʌk/', chinese: '卡车' },
+  
+  // 自然
+  'sun': { phonetic: '/sʌn/', chinese: '太阳' },
+  'moon': { phonetic: '/muːn/', chinese: '月亮' },
+  'star': { phonetic: '/stɑːr/', chinese: '星星' },
+  'cloud': { phonetic: '/klaʊd/', chinese: '云' },
+  'rain': { phonetic: '/reɪn/', chinese: '雨' },
+  'snow': { phonetic: '/snoʊ/', chinese: '雪' },
+  'wind': { phonetic: '/wɪnd/', chinese: '风' },
+  'tree': { phonetic: '/triː/', chinese: '树' },
+  'flower': { phonetic: '/ˈflaʊər/', chinese: '花' },
+  'grass': { phonetic: '/ɡræs/', chinese: '草' },
+  'mountain': { phonetic: '/ˈmaʊntn/', chinese: '山' },
+  'river': { phonetic: '/ˈrɪvər/', chinese: '河' },
+  'sea': { phonetic: '/siː/', chinese: '海' },
+  'beach': { phonetic: '/biːtʃ/', chinese: '沙滩' },
+  
+  // 身体
+  'head': { phonetic: '/hed/', chinese: '头' },
+  'hand': { phonetic: '/hænd/', chinese: '手' },
+  'foot': { phonetic: '/fʊt/', chinese: '脚' },
+  'eye': { phonetic: '/aɪ/', chinese: '眼睛' },
+  'ear': { phonetic: '/ɪr/', chinese: '耳朵' },
+  'nose': { phonetic: '/noʊz/', chinese: '鼻子' },
+  'mouth': { phonetic: '/maʊθ/', chinese: '嘴巴' },
+  'tooth': { phonetic: '/tuːθ/', chinese: '牙齿' },
+  'teeth': { phonetic: '/tiːθ/', chinese: '牙齿(复数)' },
+  'hair': { phonetic: '/her/', chinese: '头发' },
+  
+  // 家庭
+  'mum': { phonetic: '/mʌm/', chinese: '妈妈' },
+  'mom': { phonetic: '/mɑːm/', chinese: '妈妈' },
+  'dad': { phonetic: '/dæd/', chinese: '爸爸' },
+  'baby': { phonetic: '/ˈbeɪbi/', chinese: '宝宝' },
+  'family': { phonetic: '/ˈfæməli/', chinese: '家庭' },
+  
+  // 数字
+  'one': { phonetic: '/wʌn/', chinese: '一' },
+  'two': { phonetic: '/tuː/', chinese: '二' },
+  'three': { phonetic: '/θriː/', chinese: '三' },
+  'four': { phonetic: '/fɔːr/', chinese: '四' },
+  'five': { phonetic: '/faɪv/', chinese: '五' },
+  'six': { phonetic: '/sɪks/', chinese: '六' },
+  'seven': { phonetic: '/ˈsevn/', chinese: '七' },
+  'eight': { phonetic: '/eɪt/', chinese: '八' },
+  'nine': { phonetic: '/naɪn/', chinese: '九' },
+  'ten': { phonetic: '/ten/', chinese: '十' },
+  
+  // 其他常见词
+  'happy': { phonetic: '/ˈhæpi/', chinese: '开心' },
+  'sad': { phonetic: '/sæd/', chinese: '难过' },
+  'big': { phonetic: '/bɪɡ/', chinese: '大' },
+  'small': { phonetic: '/smɔːl/', chinese: '小' },
+  'hot': { phonetic: '/hɑːt/', chinese: '热' },
+  'cold': { phonetic: '/koʊld/', chinese: '冷' },
+  'new': { phonetic: '/nuː/', chinese: '新的' },
+  'old': { phonetic: '/oʊld/', chinese: '旧的/老的' },
+  'good': { phonetic: '/ɡʊd/', chinese: '好的' },
+  'bad': { phonetic: '/bæd/', chinese: '坏的' },
+  'yes': { phonetic: '/jes/', chinese: '是' },
+  'no': { phonetic: '/noʊ/', chinese: '不' },
+  'hello': { phonetic: '/həˈloʊ/', chinese: '你好' },
+  'bye': { phonetic: '/baɪ/', chinese: '再见' },
+  'love': { phonetic: '/lʌv/', chinese: '爱' },
+  'house': { phonetic: '/haʊs/', chinese: '房子' },
+  'school': { phonetic: '/skuːl/', chinese: '学校' },
+  'park': { phonetic: '/pɑːrk/', chinese: '公园' },
+  'shop': { phonetic: '/ʃɑːp/', chinese: '商店' },
+  'hospital': { phonetic: '/ˈhɑːspɪtl/', chinese: '医院' },
+  'friend': { phonetic: '/frend/', chinese: '朋友' },
+  'teacher': { phonetic: '/ˈtiːtʃər/', chinese: '老师' },
+  'student': { phonetic: '/ˈstuːdnt/', chinese: '学生' },
+};
+
+// ========== 单词表功能 ==========
+function getWordPhonetic(word) {
+  const clean = word.toLowerCase().replace(/s$/, '');
+  if (dictionary[word]) return dictionary[word];
+  if (dictionary[clean]) return dictionary[clean];
+  // 模糊匹配
+  for (const [key, val] of Object.entries(dictionary)) {
+    if (word.includes(key) || key.includes(word)) return val;
+  }
+  return { phonetic: '/', chinese: '—' };
+}
+
+function openWordList() {
+  // 收集所有单词（去重）
+  const allWords = new Set();
+  for (const set of Object.values(wordSets)) {
+    set.words.forEach(w => allWords.add(w.label.toLowerCase()));
+  }
+  
+  const sortedWords = [...allWords].sort();
+  
+  let html = `
+    <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="margin: 0; color: #2d3436;">📖 总词库单词表（${sortedWords.length}词）</h3>
+      <button onclick="printWordList()" style="padding: 6px 12px; background: #0984e3; color: white; border: none; border-radius: 6px; cursor: pointer;">🖨️ 打印</button>
+    </div>
+    <div style="overflow-x: auto;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.95em;">
+        <thead>
+          <tr style="background: #00b894; color: white;">
+            <th style="padding: 10px; text-align: left; border-radius: 8px 0 0 0;">#</th>
+            <th style="padding: 10px; text-align: left;">单词</th>
+            <th style="padding: 10px; text-align: left;">音标</th>
+            <th style="padding: 10px; text-align: left; border-radius: 0 8px 0 0;">中文</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
+  
+  sortedWords.forEach((word, i) => {
+    const info = getWordPhonetic(word);
+    const bg = i % 2 === 0 ? '#f8f9fa' : '#fff';
+    html += `
+      <tr style="background: ${bg}; border-bottom: 1px solid #eee;">
+        <td style="padding: 8px 10px; color: #b2bec3;">${i + 1}</td>
+        <td style="padding: 8px 10px; font-weight: bold; font-size: 1.05em;">${word}</td>
+        <td style="padding: 8px 10px; color: #6c5ce7; font-family: serif;">${info.phonetic}</td>
+        <td style="padding: 8px 10px; color: #e17055;">${info.chinese}</td>
+      </tr>
+    `;
+  });
+  
+  html += `
+        </tbody>
+      </table>
+    </div>
+  `;
+  
+  document.getElementById('wordListContent').innerHTML = html;
+  document.getElementById('wordListModal').style.display = 'flex';
+}
+
+function closeWordList() {
+  document.getElementById('wordListModal').style.display = 'none';
+}
+
+function printWordList() {
+  const content = document.getElementById('wordListContent').innerHTML;
+  const win = window.open('', '', 'width=800,height=600');
+  win.document.write(`
+    <html><head><title>单词表</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 20px; }
+      table { width: 100%; border-collapse: collapse; }
+      th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #ddd; }
+      th { background: #00b894; color: white; }
+      tr:nth-child(even) { background: #f8f9fa; }
+    </style></head><body>
+    <h2>📖 总词库单词表</h2>
+    ${content}
+    </body></html>
+  `);
+  win.document.close();
+  win.print();
+}
+
+init();
+</script>
+
+<!-- 编辑词库弹窗 -->
+<div id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+  <div style="background: white; border-radius: 20px; padding: 30px; width: 90%; max-width: 500px; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+    <h3 style="margin-top: 0; color: #2d3436;">📝 编辑词库</h3>
+    
+    <div style="margin-bottom: 15px;">
+      <label style="font-weight: bold; color: #636e72;">词库名称：</label>
+      <input type="text" id="editSetName" style="width: 100%; padding: 10px; border: 2px solid #dfe6e9; border-radius: 8px; font-size: 1em; margin-top: 5px;">
+    </div>
+    
+    <div style="margin-bottom: 15px;">
+      <label style="font-weight: bold; color: #636e72;">单词列表：</label>
+      <div id="editWordsList" style="margin-top: 10px;"></div>
+    </div>
+    
+    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+      <button onclick="closeEditModal()" style="padding: 10px 20px; background: #dfe6e9; border: none; border-radius: 8px; cursor: pointer; font-size: 1em;">取消</button>
+      <button onclick="saveEditChanges()" style="padding: 10px 20px; background: #00b894; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1em;">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 隐藏的图片上传 input -->
+<input type="file" id="editImageFileInput" accept="image/*" style="display:none;"
+       onchange="handleEditImageUpload(event)">
+
+<!-- 单词表弹窗 -->
+<div id="wordListModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+  <div style="background: white; border-radius: 20px; padding: 30px; width: 95%; max-width: 700px; max-height: 85vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.3);">
+    <div id="wordListContent"></div>
+    <div style="text-align: center; margin-top: 15px;">
+      <button onclick="closeWordList()" style="padding: 10px 30px; background: #636e72; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1em;">关闭</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

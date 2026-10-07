@@ -1,0 +1,775 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拼读积木 - Blending Blocks</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* 星空背景 */
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .star {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 1.5s infinite;
+        }
+
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        /* 头部 */
+        .header {
+            text-align: center;
+            padding: 30px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #f39c12, #e74c3c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #a0a0a0;
+            font-size: 1.1em;
+        }
+
+        /* 分类标签 */
+        .tabs {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 30px 0;
+            flex-wrap: wrap;
+            position: relative;
+            z-index: 1;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .tab:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .tab.active {
+            background: linear-gradient(45deg, #f39c12, #e74c3c);
+            box-shadow: 0 4px 15px rgba(243, 156, 18, 0.4);
+        }
+
+        /* 单词网格 */
+        .word-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 12px;
+            margin: 30px 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        .word-btn {
+            padding: 15px 10px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            background: linear-gradient(145deg, #2d3748, #1a202c);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .word-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 6px 20px rgba(243, 156, 18, 0.4);
+        }
+
+        .word-btn.selected {
+            background: linear-gradient(145deg, #f39c12, #e67e22);
+            transform: scale(1.1);
+        }
+
+        /* 积木区域 */
+        .blocks-area {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            margin: 30px 0;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            backdrop-filter: blur(10px);
+        }
+
+        .blocks-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin: 30px 0;
+        }
+
+        .phoneme-block {
+            width: 80px;
+            height: 80px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: white;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .phoneme-block:nth-child(1) {
+            background: linear-gradient(145deg, #667eea, #764ba2);
+        }
+
+        .phoneme-block:nth-child(2) {
+            background: linear-gradient(145deg, #f093fb, #f5576c);
+        }
+
+        .phoneme-block:nth-child(3) {
+            background: linear-gradient(145deg, #4facfe, #00f2fe);
+        }
+
+        .phoneme-block:hover {
+            transform: scale(1.1) rotate(5deg);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+        }
+
+        .phoneme-block:active {
+            transform: scale(0.95);
+        }
+
+        .plus-sign {
+            font-size: 2em;
+            color: #a0a0a0;
+        }
+
+        .blend-btn {
+            padding: 15px 40px;
+            border: none;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 1.2em;
+            font-weight: bold;
+            background: linear-gradient(45deg, #11998e, #38ef7d);
+            color: white;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .blend-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(17, 153, 142, 0.5);
+        }
+
+        .result-word {
+            font-size: 3em;
+            font-weight: bold;
+            margin-top: 20px;
+            background: linear-gradient(45deg, #f39c12, #e74c3c);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            min-height: 60px;
+        }
+
+        /* 例句区域 */
+        .sentence-area {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 25px;
+            margin-top: 20px;
+            text-align: left;
+        }
+
+        .sentence-area h3 {
+            color: #f39c12;
+            margin-bottom: 15px;
+        }
+
+        .sentence {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin: 8px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .sentence:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateX(5px);
+        }
+
+        .sentence .en {
+            font-size: 1.1em;
+            color: white;
+        }
+
+        .sentence .cn {
+            font-size: 0.9em;
+            color: #a0a0a0;
+            margin-top: 5px;
+        }
+
+        /* 控制按钮 */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1em;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-btn.primary {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+            color: white;
+        }
+
+        .control-btn.secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .control-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 音量控制 */
+        .volume-control {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 15px;
+            z-index: 100;
+        }
+
+        .volume-slider {
+            width: 100px;
+            margin-left: 10px;
+        }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .phoneme-block {
+                width: 60px;
+                height: 60px;
+                font-size: 1.5em;
+            }
+
+            .word-grid {
+                grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+            }
+
+            .blocks-area {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+
+    <div class="container">
+        <header class="header">
+            <h1>🧱 拼读积木</h1>
+            <p>点单词选词 → 点音素块听发音 → 连起来拼读 → 看例句</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" data-category="cvc">CVC 短元音</button>
+            <button class="tab" data-category="consonant">辅音连缀</button>
+            <button class="tab" data-category="long">长元音</button>
+            <button class="tab" data-category="noun">名词</button>
+            <button class="tab" data-category="verb">动词</button>
+        </div>
+
+        <div class="word-grid" id="wordGrid"></div>
+
+        <div class="blocks-area">
+            <div class="blocks-container" id="blocksContainer">
+                <div class="phoneme-block" data-index="0">?</div>
+                <span class="plus-sign">+</span>
+                <div class="phoneme-block" data-index="1">?</div>
+                <span class="plus-sign">+</span>
+                <div class="phoneme-block" data-index="2">?</div>
+            </div>
+
+            <button class="blend-btn" id="blendBtn">🔗 连起来读</button>
+
+            <div class="result-word" id="resultWord"></div>
+
+            <div class="controls">
+                <button class="control-btn primary" id="speakBtn">
+                    🔊 单独发音
+                </button>
+                <button class="control-btn secondary" id="randomBtn">
+                    🎲 随机下一个
+                </button>
+                <button class="control-btn secondary" id="slowBtn">
+                    🐢 慢速播放
+                </button>
+            </div>
+
+            <div class="sentence-area" id="sentenceArea">
+                <h3>📖 引导输出</h3>
+                <div id="sentences"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="volume-control">
+        🔊 <input type="range" class="volume-slider" id="volumeSlider" min="0" max="100" value="80">
+    </div>
+
+    <script>
+        // 单词数据库
+        const wordDatabase = {
+            cvc: {
+                a: [
+                    { word: 'cat', phonemes: ['c', 'a', 't'], sentences: ['I see a cat.', 'The cat is cute.', '我看到一只猫。'] },
+                    { word: 'hat', phonemes: ['h', 'a', 't'], sentences: ['My hat is red.', 'I wear a hat.', '我的帽子是红色的。'] },
+                    { word: 'map', phonemes: ['m', 'a', 'p'], sentences: ['I have a map.', 'Let me see the map.', '我有一张地图。'] },
+                    { word: 'bag', phonemes: ['b', 'a', 'g'], sentences: ['My bag is big.', 'I put it in my bag.', '我的书包很大。'] },
+                    { word: 'dad', phonemes: ['d', 'a', 'd'], sentences: ['My dad is strong.', 'I love my dad.', '我的爸爸很强壮。'] },
+                    { word: 'man', phonemes: ['m', 'a', 'n'], sentences: ['The man is tall.', 'I see a man.', '那个男人很高。'] },
+                    { word: 'can', phonemes: ['c', 'a', 'n'], sentences: ['I can do it.', 'Can you help me?', '我会做。'] },
+                    { word: 'ran', phonemes: ['r', 'a', 'n'], sentences: ['I ran fast.', 'The dog ran away.', '我跑得很快。'] }
+                ],
+                e: [
+                    { word: 'bed', phonemes: ['b', 'e', 'd'], sentences: ['I sleep in my bed.', 'The bed is soft.', '我在床上睡觉。'] },
+                    { word: 'red', phonemes: ['r', 'e', 'd'], sentences: ['I like red.', 'The apple is red.', '我喜欢红色。'] },
+                    { word: 'hen', phonemes: ['h', 'e', 'n'], sentences: ['The hen lays eggs.', 'I see a hen.', '母鸡下蛋。'] },
+                    { word: 'ten', phonemes: ['t', 'e', 'n'], sentences: ['I have ten fingers.', 'Count to ten.', '我有十个手指。'] },
+                    { word: 'pen', phonemes: ['p', 'e', 'n'], sentences: ['I write with a pen.', 'Where is my pen?', '我用钢笔写字。'] },
+                    { word: 'leg', phonemes: ['l', 'e', 'g'], sentences: ['My leg hurts.', 'I have two legs.', '我的腿疼。'] },
+                    { word: 'let', phonemes: ['l', 'e', 't'], sentences: ['Let me help you.', 'Let us go!', '让我帮你。'] },
+                    { word: 'get', phonemes: ['g', 'e', 't'], sentences: ['I get it.', 'Can I get one?', '我明白了。'] }
+                ],
+                i: [
+                    { word: 'pig', phonemes: ['p', 'i', 'g'], sentences: ['The pig is pink.', 'I see a pig.', '猪是粉红色的。'] },
+                    { word: 'sit', phonemes: ['s', 'i', 't'], sentences: ['Please sit down.', 'I sit on a chair.', '请坐下。'] },
+                    { word: 'hit', phonemes: ['h', 'i', 't'], sentences: ['I can hit the ball.', 'Do not hit me.', '我能打中球。'] },
+                    { word: 'big', phonemes: ['b', 'i', 'g'], sentences: ['The elephant is big.', 'I have a big dog.', '大象很大。'] },
+                    { word: 'dig', phonemes: ['d', 'i', 'g'], sentences: ['I dig a hole.', 'Let us dig for treasure.', '我挖一个洞。'] },
+                    { word: 'wig', phonemes: ['w', 'i', 'g'], sentences: ['She wears a wig.', 'The wig is funny.', '她戴假发。'] },
+                    { word: 'kid', phonemes: ['k', 'i', 'd'], sentences: ['I am a kid.', 'The kid is happy.', '我是一个小孩。'] },
+                    { word: 'lid', phonemes: ['l', 'i', 'd'], sentences: ['Open the lid.', 'The lid is tight.', '打开盖子。'] }
+                ],
+                o: [
+                    { word: 'dog', phonemes: ['d', 'o', 'g'], sentences: ['The dog is friendly.', 'I have a dog.', '狗很友好。'] },
+                    { word: 'hot', phonemes: ['h', 'o', 't'], sentences: ['It is hot today.', 'The soup is hot.', '今天很热。'] },
+                    { word: 'pot', phonemes: ['p', 'o', 't'], sentences: ['I cook in a pot.', 'The pot is big.', '我用锅做饭。'] },
+                    { word: 'top', phonemes: ['t', 'o', 'p'], sentences: ['I spin the top.', 'The top is fast.', '我转动陀螺。'] },
+                    { word: 'mom', phonemes: ['m', 'o', 'm'], sentences: ['I love my mom.', 'Mom is the best.', '我爱妈妈。'] },
+                    { word: 'pop', phonemes: ['p', 'o', 'p'], sentences: ['Pop goes the weasel!', 'I like popcorn.', '砰！'] },
+                    { word: 'hop', phonemes: ['h', 'o', 'p'], sentences: ['I hop like a bunny.', 'Let us hop!', '我像兔子一样跳。'] },
+                    { word: 'mop', phonemes: ['m', 'o', 'p'], sentences: ['I mop the floor.', 'The mop is wet.', '我拖地。'] }
+                ],
+                u: [
+                    { word: 'cup', phonemes: ['c', 'u', 'p'], sentences: ['I drink from a cup.', 'The cup is full.', '我用杯子喝水。'] },
+                    { word: 'run', phonemes: ['r', 'u', 'n'], sentences: ['I run fast.', 'Let us run!', '我跑得快。'] },
+                    { word: 'sun', phonemes: ['s', 'u', 'n'], sentences: ['The sun is bright.', 'I like the sun.', '太阳很亮。'] },
+                    { word: 'fun', phonemes: ['f', 'u', 'n'], sentences: ['This is fun!', 'We have fun together.', '这很有趣！'] },
+                    { word: 'gun', phonemes: ['g', 'u', 'n'], sentences: ['The toy gun is red.', 'I do not have a gun.', '玩具枪是红色的。'] },
+                    { word: 'bun', phonemes: ['b', 'u', 'n'], sentences: ['I eat a bun.', 'The bun is warm.', '我吃一个面包。'] },
+                    { word: 'nun', phonemes: ['n', 'u', 'n'], sentences: ['The nun is kind.', 'I see a nun.', '修女很善良。'] },
+                    { word: 'rug', phonemes: ['r', 'u', 'g'], sentences: ['I sit on the rug.', 'The rug is soft.', '我坐在地毯上。'] }
+                ]
+            },
+            consonant: {
+                bl: [
+                    { word: 'black', phonemes: ['bl', 'a', 'ck'], sentences: ['The cat is black.', 'I like black.', '猫是黑色的。'] },
+                    { word: 'blue', phonemes: ['bl', 'ue'], sentences: ['The sky is blue.', 'I like blue.', '天空是蓝色的。'] },
+                    { word: 'blind', phonemes: ['bl', 'i', 'nd'], sentences: ['He is blind.', 'The blind man has a dog.', '他是盲人。'] },
+                    { word: 'block', phonemes: ['bl', 'o', 'ck'], sentences: ['I build with blocks.', 'The block is red.', '我用积木搭建。'] },
+                    { word: 'blow', phonemes: ['bl', 'o', 'w'], sentences: ['I blow the candle.', 'The wind blows.', '我吹蜡烛。'] }
+                ],
+                cl: [
+                    { word: 'clap', phonemes: ['cl', 'a', 'p'], sentences: ['I clap my hands.', 'Let us clap!', '我拍手。'] },
+                    { word: 'clip', phonemes: ['cl', 'i', 'p'], sentences: ['I use a clip.', 'The clip is small.', '我用夹子。'] },
+                    { word: 'clock', phonemes: ['cl', 'o', 'ck'], sentences: ['The clock is ticking.', 'What time is it?', '时钟在滴答响。'] },
+                    { word: 'close', phonemes: ['cl', 'o', 'se'], sentences: ['Please close the door.', 'I close my eyes.', '请关门。'] },
+                    { word: 'cloud', phonemes: ['cl', 'ou', 'd'], sentences: ['I see a cloud.', 'The cloud is white.', '我看到一朵云。'] }
+                ],
+                fl: [
+                    { word: 'flag', phonemes: ['fl', 'a', 'g'], sentences: ['I see a flag.', 'The flag is red.', '我看到一面旗。'] },
+                    { word: 'flat', phonemes: ['fl', 'a', 't'], sentences: ['The tire is flat.', 'I live in a flat.', '轮胎没气了。'] },
+                    { word: 'flip', phonemes: ['fl', 'i', 'p'], sentences: ['I flip the page.', 'Let us flip a coin.', '我翻页。'] },
+                    { word: 'flow', phonemes: ['fl', 'o', 'w'], sentences: ['Water flows down.', 'The river flows fast.', '水往下流。'] },
+                    { word: 'fly', phonemes: ['fl', 'y'], sentences: ['I can fly.', 'Birds fly in the sky.', '我会飞。'] }
+                ],
+                gl: [
+                    { word: 'glad', phonemes: ['gl', 'a', 'd'], sentences: ['I am glad to see you.', 'She is glad.', '很高兴见到你。'] },
+                    { word: 'glass', phonemes: ['gl', 'a', 'ss'], sentences: ['I drink from a glass.', 'The glass is clear.', '我用玻璃杯喝水。'] },
+                    { word: 'glide', phonemes: ['gl', 'i', 'de'], sentences: ['I glide on ice.', 'The penguin can glide.', '我在冰上滑行。'] },
+                    { word: 'glow', phonemes: ['gl', 'o', 'w'], sentences: ['The light glows.', 'I glow in the dark.', '灯发光。'] },
+                    { word: 'glue', phonemes: ['gl', 'ue'], sentences: ['I use glue.', 'The glue is sticky.', '我用胶水。'] }
+                ],
+                pl: [
+                    { word: 'plan', phonemes: ['pl', 'a', 'n'], sentences: ['I have a plan.', 'Let us make a plan.', '我有一个计划。'] },
+                    { word: 'play', phonemes: ['pl', 'a', 'y'], sentences: ['I like to play.', 'Let us play!', '我喜欢玩。'] },
+                    { word: 'plot', phonemes: ['pl', 'o', 't'], sentences: ['I read the plot.', 'The plot is exciting.', '我读情节。'] },
+                    { word: 'plow', phonemes: ['pl', 'o', 'w'], sentences: ['The farmer plows.', 'I see a plow.', '农民耕地。'] },
+                    { word: 'plug', phonemes: ['pl', 'u', 'g'], sentences: ['I plug in the cord.', 'The plug is safe.', '我插上插头。'] }
+                ],
+                sl: [
+                    { word: 'slam', phonemes: ['sl', 'a', 'm'], sentences: ['I slam the door.', 'Do not slam!', '我用力关门。'] },
+                    { word: 'slip', phonemes: ['sl', 'i', 'p'], sentences: ['I slip on the ice.', 'Be careful not to slip!', '我在冰上滑倒。'] },
+                    { word: 'slow', phonemes: ['sl', 'o', 'w'], sentences: ['I walk slow.', 'The turtle is slow.', '我走得很慢。'] },
+                    { word: 'slug', phonemes: ['sl', 'u', 'g'], sentences: ['I see a slug.', 'The slug is slow.', '我看到一只鼻涕虫。'] },
+                    { word: 'sled', phonemes: ['sl', 'e', 'd'], sentences: ['I ride a sled.', 'The sled is fast.', '我坐雪橇。'] }
+                ],
+                st: [
+                    { word: 'stop', phonemes: ['st', 'o', 'p'], sentences: ['I stop the car.', 'Please stop!', '我停车。'] },
+                    { word: 'step', phonemes: ['st', 'e', 'p'], sentences: ['I take a step.', 'Step on the line.', '我走一步。'] },
+                    { word: 'stick', phonemes: ['st', 'i', 'ck'], sentences: ['I pick up a stick.', 'The stick is long.', '我捡起一根棍子。'] },
+                    { word: 'still', phonemes: ['st', 'i', 'll'], sentences: ['I am still here.', 'Please be still.', '我还在这里。'] },
+                    { word: 'stone', phonemes: ['st', 'o', 'ne'], sentences: ['I throw a stone.', 'The stone is heavy.', '我扔石头。'] }
+                ]
+            },
+            long: {
+                a_e: [
+                    { word: 'cake', phonemes: ['c', 'a', 'ke'], sentences: ['I eat cake.', 'The cake is yummy.', '我吃蛋糕。'] },
+                    { word: 'make', phonemes: ['m', 'a', 'ke'], sentences: ['I make a sandcastle.', 'Let us make art.', '我做沙堡。'] },
+                    { word: 'lake', phonemes: ['l', 'a', 'ke'], sentences: ['I swim in the lake.', 'The lake is big.', '我在湖里游泳。'] },
+                    { word: 'gate', phonemes: ['g', 'a', 'te'], sentences: ['I open the gate.', 'The gate is tall.', '我打开大门。'] },
+                    { word: 'name', phonemes: ['n', 'a', 'me'], sentences: ['My name is Tom.', 'What is your name?', '我的名字是Tom。'] }
+                ],
+                i_e: [
+                    { word: 'bike', phonemes: ['b', 'i', 'ke'], sentences: ['I ride my bike.', 'The bike is fast.', '我骑自行车。'] },
+                    { word: 'like', phonemes: ['l', 'i', 'ke'], sentences: ['I like ice cream.', 'Do you like it?', '我喜欢冰淇淋。'] },
+                    { word: 'time', phonemes: ['t', 'i', 'me'], sentences: ['What time is it?', 'It is time to go.', '几点了？'] },
+                    { word: 'line', phonemes: ['l', 'i', 'ne'], sentences: ['Stand in line.', 'Draw a line.', '排成一行。'] },
+                    { word: 'mine', phonemes: ['m', 'i', 'ne'], sentences: ['This is mine.', 'That book is mine.', '这是我的。'] }
+                ],
+                o_e: [
+                    { word: 'home', phonemes: ['h', 'o', 'me'], sentences: ['I go home.', 'Home is sweet.', '我回家。'] },
+                    { word: 'nose', phonemes: ['n', 'o', 'se'], sentences: ['I touch my nose.', 'My nose is cold.', '我摸鼻子。'] },
+                    { word: 'hope', phonemes: ['h', 'o', 'pe'], sentences: ['I hope so!', 'I hope you are happy.', '我希望如此！'] },
+                    { word: 'note', phonemes: ['n', 'o', 'te'], sentences: ['I write a note.', 'Read this note.', '我写一张便条。'] },
+                    { word: 'rope', phonemes: ['r', 'o', 'pe'], sentences: ['I jump rope.', 'The rope is long.', '我跳绳。'] }
+                ],
+                u_e: [
+                    { word: 'cute', phonemes: ['c', 'u', 'te'], sentences: ['The puppy is cute.', 'You are so cute!', '小狗很可爱。'] },
+                    { word: 'tube', phonemes: ['t', 'u', 'be'], sentences: ['I squeeze the tube.', 'The tube is full.', '我挤管子。'] },
+                    { word: 'use', phonemes: ['u', 'se'], sentences: ['I use a pencil.', 'Can I use this?', '我用铅笔。'] },
+                    { word: 'huge', phonemes: ['h', 'u', 'ge'], sentences: ['The dinosaur is huge!', 'That is huge!', '恐龙很大！'] },
+                    { word: 'fuse', phonemes: ['f', 'u', 'se'], sentences: ['Be careful with the fuse.', 'The fuse is hot.', '小心保险丝。'] }
+                ],
+                ee: [
+                    { word: 'see', phonemes: ['s', 'ee'], sentences: ['I see a bird.', 'Can you see it?', '我看到一只鸟。'] },
+                    { word: 'tree', phonemes: ['tr', 'ee'], sentences: ['I climb the tree.', 'The tree is tall.', '我爬树。'] },
+                    { word: 'bee', phonemes: ['b', 'ee'], sentences: ['I see a bee.', 'The bee makes honey.', '我看到一只蜜蜂。'] },
+                    { word: 'free', phonemes: ['fr', 'ee'], sentences: ['I am free today.', 'The bird is free.', '我今天有空。'] },
+                    { word: 'knee', phonemes: ['k', 'n', 'ee'], sentences: ['I hurt my knee.', 'Bend your knee.', '我伤到膝盖了。'] }
+                ],
+                ea: [
+                    { word: 'eat', phonemes: ['e', 'a', 't'], sentences: ['I eat breakfast.', 'What do you want to eat?', '我吃早餐。'] },
+                    { word: 'tea', phonemes: ['t', 'ea'], sentences: ['I drink tea.', 'The tea is hot.', '我喝茶。'] },
+                    { word: 'read', phonemes: ['r', 'ea', 'd'], sentences: ['I like to read.', 'Read this book.', '我喜欢阅读。'] },
+                    { word: 'clean', phonemes: ['cl', 'ea', 'n'], sentences: ['I clean my room.', 'The room is clean.', '我打扫房间。'] },
+                    { word: 'dream', phonemes: ['dr', 'ea', 'm'], sentences: ['I dream at night.', 'I have a good dream.', '我晚上做梦。'] }
+                ]
+            },
+            noun: [
+                { word: 'apple', phonemes: ['a', 'p', 'ple'], sentences: ['I eat an apple.', 'The apple is red.', '我吃一个苹果。'] },
+                { word: 'ball', phonemes: ['b', 'a', 'll'], sentences: ['I kick the ball.', 'The ball is round.', '我踢球。'] },
+                { word: 'cat', phonemes: ['c', 'a', 't'], sentences: ['The cat is sleeping.', 'I have a cat.', '猫在睡觉。'] },
+                { word: 'dog', phonemes: ['d', 'o', 'g'], sentences: ['The dog is barking.', 'I like dogs.', '狗在叫。'] },
+                { word: 'egg', phonemes: ['e', 'gg'], sentences: ['I eat an egg.', 'The egg is white.', '我吃一个鸡蛋。'] },
+                { word: 'fish', phonemes: ['f', 'i', 'sh'], sentences: ['I see a fish.', 'The fish can swim.', '我看到一条鱼。'] },
+                { word: 'girl', phonemes: ['g', 'i', 'rl'], sentences: ['The girl is happy.', 'I am a girl.', '女孩很开心。'] },
+                { word: 'house', phonemes: ['h', 'ou', 'se'], sentences: ['I live in a house.', 'The house is big.', '我住在房子里。'] },
+                { word: 'ice', phonemes: ['i', 'ce'], sentences: ['I like ice cream.', 'The ice is cold.', '我喜欢冰淇淋。'] },
+                { word: 'juice', phonemes: ['j', 'u', 'ice'], sentences: ['I drink juice.', 'The juice is yummy.', '我喝果汁。'] }
+            ],
+            verb: [
+                { word: 'run', phonemes: ['r', 'u', 'n'], sentences: ['I run fast.', 'Let us run!', '我跑得快。'] },
+                { word: 'jump', phonemes: ['j', 'u', 'mp'], sentences: ['I jump high.', 'Can you jump?', '我跳得高。'] },
+                { word: 'sing', phonemes: ['s', 'i', 'ng'], sentences: ['I like to sing.', 'Let us sing a song.', '我喜欢唱歌。'] },
+                { word: 'dance', phonemes: ['d', 'a', 'nce'], sentences: ['I can dance.', 'She dances well.', '我会跳舞。'] },
+                { word: 'read', phonemes: ['r', 'ea', 'd'], sentences: ['I read books.', 'Reading is fun.', '我读书。'] },
+                { word: 'write', phonemes: ['w', 'r', 'i', 'te'], sentences: ['I write a letter.', 'I like to write.', '我写信。'] },
+                { word: 'draw', phonemes: ['dr', 'a', 'w'], sentences: ['I draw pictures.', 'She draws well.', '我画画。'] },
+                { word: 'play', phonemes: ['pl', 'a', 'y'], sentences: ['I play with friends.', 'Let us play!', '我和朋友玩。'] },
+                { word: 'eat', phonemes: ['e', 'a', 't'], sentences: ['I eat lunch.', 'What do you eat?', '我吃午饭。'] },
+                { word: 'drink', phonemes: ['dr', 'i', 'nk'], sentences: ['I drink water.', 'Do you want a drink?', '我喝水。'] }
+            ]
+        };
+
+        // 全局变量
+        let currentCategory = 'cvc';
+        let currentVowel = 'a';
+        let currentWord = null;
+        let volume = 0.8;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            createStars();
+            loadWords();
+            setupEventListeners();
+        });
+
+        // 创建星空背景
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.animationDelay = Math.random() * 1.5 + 's';
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // 加载单词
+        function loadWords() {
+            const grid = document.getElementById('wordGrid');
+            grid.innerHTML = '';
+
+            let words = [];
+            if (currentCategory === 'cvc') {
+                words = wordDatabase.cvc[currentVowel] || [];
+            } else if (currentCategory === 'consonant') {
+                Object.values(wordDatabase.consonant).forEach(categoryWords => {
+                    words = words.concat(categoryWords);
+                });
+            } else if (currentCategory === 'long') {
+                Object.values(wordDatabase.long).forEach(categoryWords => {
+                    words = words.concat(categoryWords);
+                });
+            } else if (currentCategory === 'noun') {
+                words = wordDatabase.noun;
+            } else if (currentCategory === 'verb') {
+                words = wordDatabase.verb;
+            }
+
+            words.forEach(wordData => {
+                const btn = document.createElement('button');
+                btn.className = 'word-btn';
+                btn.textContent = wordData.word;
+                btn.addEventListener('click', () => selectWord(wordData, btn));
+                grid.appendChild(btn);
+            });
+
+            // 清空积木区
+            clearBlocks();
+        }
+
+        // 选择单词
+        function selectWord(wordData, btn) {
+            // 移除其他选中状态
+            document.querySelectorAll('.word-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+
+            currentWord = wordData;
+            updateBlocks(wordData.phonemes);
+            showSentences(wordData.sentences);
+        }
+
+        // 更新积木
+        function updateBlocks(phonemes) {
+            const blocks = document.querySelectorAll('.phoneme-block');
+            blocks.forEach((block, index) => {
+                if (phonemes[index]) {
+                    block.textContent = phonemes[index];
+                    block.style.opacity = '1';
+                } else {
+                    block.textContent = '?';
+                    block.style.opacity = '0.5';
+                }
+            });
+
+            document.getElementById('resultWord').textContent = '';
+        }
+
+        // 清空积木
+        function clearBlocks() {
+            const blocks = document.querySelectorAll('.phoneme-block');
+            blocks.forEach(block => {
+                block.textContent = '?';
+                block.style.opacity = '0.5';
+            });
+            document.getElementById('resultWord').textContent = '';
+            document.getElementById('sentences').innerHTML = '';
+        }
+
+        // 显示例句
+        function showSentences(sentences) {
+            const container = document.getElementById('sentences');
+            container.innerHTML = '';
+
+            sentences.forEach(sentence => {
+                const div = document.createElement('div');
+                div.className = 'sentence';
+                div.innerHTML = `
+                    <div class="en">${sentence}</div>
+                    <div class="cn">${sentence}</div>
+                `;
+                div.addEventListener('click', () => speak(sentence));
+                container.appendChild(div);
+            });
+        }
+
+        // 语音合成
+        function speak(text, rate = 1) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'en-US';
+                utterance.volume = volume;
+                utterance.rate = rate;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // 逐个发音
+        function speakPhonemes(phonemes, index = 0) {
+            if (index < phonemes.length) {
+                speak(phonemes[index], 0.7);
+                setTimeout(() => {
+                    speakPhonemes(phonemes, index + 1);
+                }, 500);
+            }
+        }
+
+        // 连起来读
+        function blendWord() {
+            if (currentWord) {
+                speak(currentWord.word);
+                document.getElementById('resultWord').textContent = currentWord.word;
+            }
+        }
+
+        // 设置事件监听
+        function setupEventListeners() {
+            // 分类标签
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    currentCategory = tab.dataset.category;
+                    loadWords();
+                });
+            });
+
+            // 积木点击
+            document.querySelectorAll('.phoneme-block').forEach(block => {
+                block.addEventListener('click', () => {
+                    const phoneme = block.textContent;
+                    if (phoneme && phoneme !== '?') {
+                        speak(phoneme, 0.7);
+                    }
+                });
+            });
+
+            // 连起来读按钮
+            document.getElementById('blendBtn').addEventListener('click', blendWord);
+
+            // 单独发音按钮
+            document.getElementById('speakBtn').addEventListener('click', () => {
+                if (currentWord) {
+                    speakPhonemes(currentWord.phonemes);
+                }
+            });
+
+            // 随机下一个
+            document.getElementById('randomBtn').addEventListener('click', () => {
+                const buttons = document.querySelectorAll('.word-btn');
+                if (buttons.length > 0) {
+                    const randomIndex = Math.floor(Math.random() * buttons.length);
+                    buttons[randomIndex].click();
+                }
+            });
+
+            // 慢速播放
+            document.getElementById('slowBtn').addEventListener('click', () => {
+                if (currentWord) {
+                    speak(currentWord.word, 0.5);
+                }
+            });
+
+            // 音量控制
+            document.getElementById('volumeSlider').addEventListener('input', (e) => {
+                volume = e.target.value / 100;
+            });
+        }
+    </script>
+</body>
+</html>
